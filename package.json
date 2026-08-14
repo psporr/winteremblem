@@ -1,0 +1,37 @@
+{
+  "name": "winteremblem",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "sim": "tsx scripts/simulate.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/psporr/winteremblem.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/psporr/winteremblem/issues"
+  },
+  "homepage": "https://github.com/psporr/winteremblem#readme",
+  "dependencies": {
+    "boardgame.io": "^0.50.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.0.5",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.1"
+  },
+  "type": "module"
+}
