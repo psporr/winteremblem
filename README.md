@@ -68,9 +68,21 @@ same rules can run client-side today and behind a server later.
 - **No RNG yet.** Deterministic combat keeps the prototype legible and makes the
   headless simulator a reliable regression test. Hit rates and criticals come later.
 
+## Deployment
+
+Pushes to `main` build and deploy automatically to GitHub Pages via
+`.github/workflows/deploy-pages.yml` — no server, no build step to run by hand.
+One-time setup: in the repo's **Settings → Pages**, set **Source** to
+**GitHub Actions**. After that the live build lives at
+`https://<owner>.github.io/winteremblem/`.
+
+The Vite `base` is set to `/winteremblem/` for production builds (see
+`vite.config.ts`) to match that project-site URL; the dev server still runs at
+the root.
+
 ## Roadmap
 
 - v1 (current): one chapter, 4 player units vs 5 CPU units, local play
-- Next: Firebase Auth + Firestore save/resume, more chapters, Firebase Hosting
+- Next: Firebase Auth + Firestore save/resume, more chapters
 - Later: weapon triangle, classes and growth, inventory, permadeath toggle
 - Later: online co-op for 5 players
