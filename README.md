@@ -20,6 +20,7 @@ Other scripts:
 | `npm run build`   | Typecheck, then produce a production build in `dist/`      |
 | `npm run typecheck` | Typecheck only                                           |
 | `npm run sim`     | Play a whole battle headlessly with AI on both sides       |
+| `npm run bundle`  | After a build, inline it into one shareable `dist/winter-emblem.html` |
 
 `npm run sim` is the quickest regression check: it drives a full battle to a
 win condition and fails loudly on a stalemate.
