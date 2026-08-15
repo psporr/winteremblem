@@ -27,6 +27,17 @@ export const TERRAIN: Record<TerrainType, Terrain> = {
   wall: { type: 'wall', name: 'Wall', moveCost: 0, passable: false, defBonus: 0 },
 };
 
+/** A slot an item occupies. Each unit has exactly one of each. */
+export type ItemSlot = 'weapon' | 'armor' | 'accessory';
+
+/** A physical dropped item — `defId` looks up its stats in the ITEMS catalog. */
+export interface Item {
+  instanceId: string;
+  defId: string;
+}
+
+export type EquipmentSlots = Partial<Record<ItemSlot, Item>>;
+
 export interface Unit {
   id: string;
   name: string;
@@ -36,11 +47,13 @@ export interface Unit {
   y: number;
   hp: number;
   maxHp: number;
+  /** Base attack, before any equipped item bonuses. */
   atk: number;
+  /** Base defence, before any equipped item bonuses. */
   def: number;
-  /** Movement points per turn. */
+  /** Base movement points per turn, before any equipped item bonuses. */
   move: number;
-  /** Attack reach in tiles (Manhattan distance). 1 = melee, 2 = bow. */
+  /** Base attack reach in tiles (Manhattan distance), before item bonuses. 1 = melee, 2 = bow. */
   range: number;
   /** Movement already spent this turn. */
   hasMoved: boolean;
@@ -49,6 +62,8 @@ export interface Unit {
   level: number;
   /** Progress toward the next level; reaching EXP_TO_LEVEL rolls over. */
   exp: number;
+  /** Only ever populated for player units — enemies never carry loot. */
+  equipment: EquipmentSlots;
 }
 
 export interface GameState {
@@ -65,6 +80,10 @@ export interface GameState {
   wave: number;
   /** True between clearing a wave and the player picking a blessing to continue. */
   awaitingBlessing: boolean;
+  /** Dropped items not currently equipped by any unit, shared across the squad. */
+  inventory: Item[];
+  /** Bumped on every drop so instance ids stay unique without a random source. */
+  nextItemInstance: number;
 }
 
 /** boardgame.io player IDs mapped onto the two sides of a battle. */

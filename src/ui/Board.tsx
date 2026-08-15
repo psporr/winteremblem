@@ -19,6 +19,8 @@ import { forecastCombat, type CombatForecast } from '../game/combat';
 import { decideEnemyAction } from '../game/ai';
 import { BLESSINGS } from '../game/blessings';
 import { EXP_TO_LEVEL } from '../game/classes';
+import { effectiveStats, ITEMS } from '../game/equipment';
+import type { ItemSlot } from '../game/types';
 import type { GameOver } from '../game/game';
 import pkg from '../../package.json';
 import './board.css';
@@ -73,6 +75,8 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   const [hoveredTargetId, setHoveredTargetId] = useState<string | null>(null);
   const [showThreat, setShowThreat] = useState(false);
   const [combatAnim, setCombatAnim] = useState<CombatAnim | null>(null);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [inventoryUnitId, setInventoryUnitId] = useState<string | null>(null);
 
   const isPlayerPhase =
     ctx.currentPlayer === PLAYER_ID.player && !ctx.gameover && !G.awaitingBlessing;
@@ -312,6 +316,25 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
               />
             </svg>
           </button>
+          {isPlayerPhase && (
+            <button
+              type="button"
+              className="we-iconbutton we-iconbutton--icon"
+              aria-label="Squad & inventory"
+              title="Squad & inventory"
+              onClick={() => {
+                setInventoryUnitId((current) => current ?? selectedId ?? unitsOf(G, 'player')[0]?.id ?? null);
+                setInventoryOpen(true);
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M9 2a1 1 0 0 0-1 1v1H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V3a1 1 0 0 0-1-1H9zm1 2h4v1h-4V4zM6 8h12v11H6V8zm3 2v2h2v-2H9zm4 0v2h2v-2h-2z"
+                />
+              </svg>
+            </button>
+          )}
           {isPlayerPhase && mode !== 'animating' && (
             <button
               type="button"
@@ -450,6 +473,17 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
         </aside>
       </div>
 
+      {inventoryOpen && isPlayerPhase && (
+        <InventoryPanel
+          G={G}
+          unitId={inventoryUnitId}
+          onSelectUnit={setInventoryUnitId}
+          onEquip={(unitId, instanceId) => moves.equipItem(unitId, instanceId)}
+          onUnequip={(unitId, slot) => moves.unequipItem(unitId, slot)}
+          onClose={() => setInventoryOpen(false)}
+        />
+      )}
+
       {G.awaitingBlessing && !gameover && (
         <div className="we-overlay">
           <div className="we-overlay__card we-overlay__card--blessing">
@@ -528,6 +562,126 @@ function ActionPanel({
         <button type="button" className="we-menu__item we-menu__item--back" onClick={onBack}>
           Back
         </button>
+      </div>
+    </div>
+  );
+}
+
+const SLOTS: ItemSlot[] = ['weapon', 'armor', 'accessory'];
+const SLOT_LABEL: Record<ItemSlot, string> = { weapon: 'Weapon', armor: 'Armor', accessory: 'Accessory' };
+
+/**
+ * Squad-wide gear management, reachable any time during the player phase.
+ * Equipping doesn't cost a turn, so it's deliberately not folded into the
+ * per-unit move/attack/wait menu — a dismissible overlay instead, same
+ * shell as the blessing screen.
+ */
+function InventoryPanel({
+  G,
+  unitId,
+  onSelectUnit,
+  onEquip,
+  onUnequip,
+  onClose,
+}: {
+  G: GameState;
+  unitId: string | null;
+  onSelectUnit: (id: string) => void;
+  onEquip: (unitId: string, instanceId: string) => void;
+  onUnequip: (unitId: string, slot: ItemSlot) => void;
+  onClose: () => void;
+}) {
+  const roster = unitsOf(G, 'player');
+  const unit = (unitId && G.units[unitId]) || roster[0];
+
+  return (
+    <div className="we-overlay" onClick={onClose}>
+      <div
+        className="we-overlay__card we-overlay__card--inventory"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="we-overlay__header">
+          <h2>Squad &amp; Inventory</h2>
+          <button type="button" className="we-iconbutton we-iconbutton--icon" onClick={onClose} aria-label="Close">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div className="we-roster-tabs">
+          {roster.map((candidate) => (
+            <button
+              key={candidate.id}
+              type="button"
+              className={`we-roster-tab${candidate.id === unit?.id ? ' we-roster-tab--active' : ''}`}
+              onClick={() => onSelectUnit(candidate.id)}
+            >
+              {candidate.name}
+            </button>
+          ))}
+        </div>
+
+        {unit && (
+          <>
+            <div className="we-equip-slots">
+              {SLOTS.map((slot) => {
+                const equipped = unit.equipment[slot];
+                const itemDef = equipped && ITEMS[equipped.defId];
+                return (
+                  <div key={slot} className="we-equip-slot">
+                    <span className="we-equip-slot__label">{SLOT_LABEL[slot]}</span>
+                    {itemDef ? (
+                      <>
+                        <span className="we-equip-slot__item">
+                          {itemDef.name} <em>{itemDef.description}</em>
+                        </span>
+                        <button
+                          type="button"
+                          className="we-iconbutton"
+                          onClick={() => onUnequip(unit.id, slot)}
+                        >
+                          Unequip
+                        </button>
+                      </>
+                    ) : (
+                      <span className="we-equip-slot__empty">Empty</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <h3 className="we-inventory-title">Inventory</h3>
+            {G.inventory.length === 0 ? (
+              <p className="we-inventory-empty">
+                No items yet — defeated enemies have a chance to drop gear.
+              </p>
+            ) : (
+              <div className="we-inventory-list">
+                {G.inventory.map((item) => {
+                  const itemDef = ITEMS[item.defId];
+                  return (
+                    <button
+                      key={item.instanceId}
+                      type="button"
+                      className="we-inventory-item"
+                      onClick={() => onEquip(unit.id, item.instanceId)}
+                    >
+                      <strong>{itemDef.name}</strong>
+                      <span>
+                        {SLOT_LABEL[itemDef.slot]} · {itemDef.description}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -729,6 +883,11 @@ function SidePanel({
   }
 
   const cover = terrainAt(G, inspected.x, inspected.y);
+  const stats = effectiveStats(inspected);
+  const gearAtk = stats.atk - inspected.atk;
+  const gearDef = stats.def - inspected.def;
+  const gearMove = stats.move - inspected.move;
+  const gearRange = stats.range - inspected.range;
 
   return (
     <div className="we-panel">
@@ -755,22 +914,32 @@ function SidePanel({
       <dl className="we-stats">
         <div>
           <dt>Atk</dt>
-          <dd>{inspected.atk}</dd>
+          <dd>
+            {inspected.atk}
+            {gearAtk !== 0 && <em> {gearAtk > 0 ? '+' : ''}{gearAtk}</em>}
+          </dd>
         </div>
         <div>
           <dt>Def</dt>
           <dd>
             {inspected.def}
+            {gearDef !== 0 && <em> {gearDef > 0 ? '+' : ''}{gearDef}</em>}
             {cover.defBonus > 0 && <em> +{cover.defBonus}</em>}
           </dd>
         </div>
         <div>
           <dt>Mov</dt>
-          <dd>{inspected.move}</dd>
+          <dd>
+            {inspected.move}
+            {gearMove !== 0 && <em> {gearMove > 0 ? '+' : ''}{gearMove}</em>}
+          </dd>
         </div>
         <div>
           <dt>Rng</dt>
-          <dd>{inspected.range}</dd>
+          <dd>
+            {inspected.range}
+            {gearRange !== 0 && <em> {gearRange > 0 ? '+' : ''}{gearRange}</em>}
+          </dd>
         </div>
       </dl>
       <div className="we-panel__terrain">On {cover.name.toLowerCase()}</div>

@@ -1,5 +1,6 @@
 import type { GameState, Unit } from './types';
 import { manhattan, terrainAt } from './grid';
+import { effectiveStats } from './equipment';
 
 /**
  * Damage is deliberately deterministic for v1 — no hit rate, no criticals.
@@ -7,12 +8,12 @@ import { manhattan, terrainAt } from './grid';
  */
 export function computeDamage(G: GameState, attacker: Unit, defender: Unit): number {
   const cover = terrainAt(G, defender.x, defender.y).defBonus;
-  return Math.max(1, attacker.atk - (defender.def + cover));
+  return Math.max(1, effectiveStats(attacker).atk - (effectiveStats(defender).def + cover));
 }
 
 /** A defender strikes back only if the attacker is within its own reach. */
 export function canCounter(attacker: Unit, defender: Unit): boolean {
-  return manhattan(attacker, defender) <= defender.range;
+  return manhattan(attacker, defender) <= effectiveStats(defender).range;
 }
 
 export interface CombatForecast {

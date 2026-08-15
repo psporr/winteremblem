@@ -67,6 +67,7 @@ export function spawnWave(G: GameState, wave: number, random: ShuffleAPI): void 
       hasActed: false,
       level: wave,
       exp: 0,
+      equipment: {},
     };
 
     G.units[id] = unit;

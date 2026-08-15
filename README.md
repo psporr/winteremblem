@@ -67,12 +67,20 @@ by the HP gained). The squad starts at level 5 — battle-tested from the
 start — while enemies start at level 1 on wave 1 and level up wave-for-wave,
 so the level gap only narrows as a run goes on.
 
+**Equipment.** Defeated Bandits have a chance to drop a weapon, armor, or
+accessory — the chance and the drop's slot both scale with wave number, so
+late-run kills pay off more. Drops land in a shared squad inventory; open it
+with the bag icon (top right, player phase only) to equip gear onto any unit
+or send a piece back to the inventory. Equipping doesn't cost a turn. No
+skill system yet — that's next.
+
 ## Project layout
 
 ```
 src/game/     rules layer — no React, no rendering
-  types.ts       state model and terrain table
+  types.ts       state model, terrain table, item/equipment types
   classes.ts     per-class base stats, the level/stat growth curve, EXP constants
+  equipment.ts   item catalog, effective-stats calculation, drop rolls
   maps.ts        ASCII chapter definitions -> initial state
   grid.ts        Dijkstra movement range, attack/threat range
   combat.ts      damage and counterattack forecasting
@@ -123,10 +131,11 @@ artwork drawn for this project. See [CREDITS.md](CREDITS.md).
   Byleth (Archer), Corrin (Lancer), Selva (Mage), Ake (Barbarian), Lissa
   (Cleric), Olivia (Dancer) vs waves of randomly-classed, difficulty-scaled
   Bandits drawing from the same 7-class pool, local play. Every class has
-  real sprite art
-- Next: shop + equipment system (replacing/extending the simple blessing
-  picks), Firebase Auth + Firestore save/resume, real Cleric (healing) and
-  Dancer (refresh an ally) abilities — both currently fight as ordinary
+  real sprite art. Drop-based equipment (weapon/armor/accessory) layers
+  on top of the blessing picks rather than replacing them
+- Next: passive skills (unlocked on level-up, same pick-a-card interaction
+  as blessings), Firebase Auth + Firestore save/resume, real Cleric (healing)
+  and Dancer (refresh an ally) abilities — both currently fight as ordinary
   combatants, their classic FE roles aren't implemented yet
-- Later: weapon triangle, more maps
+- Later: active/cooldown skills, weapon triangle, more maps
 - Later: online co-op for 5 players

@@ -1,7 +1,7 @@
 import type { Ctx, Game, MoveMap } from 'boardgame.io';
 import { INVALID_MOVE } from 'boardgame.io/core';
 
-import type { GameState, Team, Unit } from './types';
+import type { GameState, ItemSlot, Team, Unit } from './types';
 import { PLAYER_ID, teamOf } from './types';
 import { buildGameState, playerStartPositions, CHAPTER_1, type ShuffleAPI } from './maps';
 import { computeReachable, manhattan, tileKey, unitsOf } from './grid';
@@ -9,6 +9,7 @@ import { forecastCombat } from './combat';
 import { BLESSINGS } from './blessings';
 import { spawnWave } from './waves';
 import { EXP_PER_ATTACK, EXP_TO_LEVEL, statsAtLevel } from './classes';
+import { effectiveStats, ITEMS, rollDrop, type DropRandomAPI } from './equipment';
 
 /**
  * The slice of boardgame.io's EventsAPI we actually need. Defined locally,
@@ -87,7 +88,7 @@ function grantExp(G: GameState, unit: Unit): void {
 }
 
 export const attackUnit = (
-  { G, ctx }: { G: GameState; ctx: Ctx },
+  { G, ctx, random }: { G: GameState; ctx: Ctx; random: DropRandomAPI },
   attackerId: string,
   targetId: string,
 ) => {
@@ -95,7 +96,7 @@ export const attackUnit = (
   const target = G.units[targetId];
   if (!attacker || !target) return INVALID_MOVE;
   if (target.team === attacker.team) return INVALID_MOVE;
-  if (manhattan(attacker, target) > attacker.range) return INVALID_MOVE;
+  if (manhattan(attacker, target) > effectiveStats(attacker).range) return INVALID_MOVE;
 
   const result = forecastCombat(G, attacker, target);
 
@@ -105,6 +106,13 @@ export const attackUnit = (
   if (result.willKill) {
     pushLog(G, `${target.name} has fallen!`);
     delete G.units[targetId];
+    if (target.team === 'enemy') {
+      const drop = rollDrop(G, G.wave, random);
+      if (drop) {
+        G.inventory.push(drop);
+        pushLog(G, `${target.name} dropped ${ITEMS[drop.defId].name}!`);
+      }
+    }
     checkWaveCleared(G);
   } else if (result.counterDamage !== null) {
     attacker.hp = result.attackerHpAfter;
@@ -131,6 +139,37 @@ export const waitUnit = ({ G, ctx }: { G: GameState; ctx: Ctx }, unitId: string)
 
   unit.hasMoved = true;
   unit.hasActed = true;
+};
+
+/**
+ * Equips an item from the shared inventory onto a player unit, returning
+ * whatever was already in that slot back to the inventory. Doesn't cost a
+ * turn — equipping is available any time during the player phase, not
+ * gated behind a unit's move/attack the way Attack/Wait are.
+ */
+export const equipItem = ({ G, ctx }: { G: GameState; ctx: Ctx }, unitId: string, instanceId: string) => {
+  const unit = G.units[unitId];
+  if (!unit || unit.team !== 'player' || teamOf(ctx.currentPlayer) !== 'player') return INVALID_MOVE;
+
+  const itemIndex = G.inventory.findIndex((item) => item.instanceId === instanceId);
+  if (itemIndex === -1) return INVALID_MOVE;
+  const [item] = G.inventory.splice(itemIndex, 1);
+
+  const slot: ItemSlot = ITEMS[item.defId].slot;
+  const previous = unit.equipment[slot];
+  if (previous) G.inventory.push(previous);
+  unit.equipment[slot] = item;
+};
+
+/** Returns an equipped item to the shared inventory. */
+export const unequipItem = ({ G, ctx }: { G: GameState; ctx: Ctx }, unitId: string, slot: ItemSlot) => {
+  const unit = G.units[unitId];
+  if (!unit || unit.team !== 'player' || teamOf(ctx.currentPlayer) !== 'player') return INVALID_MOVE;
+
+  const item = unit.equipment[slot];
+  if (!item) return INVALID_MOVE;
+  delete unit.equipment[slot];
+  G.inventory.push(item);
 };
 
 /**
@@ -172,7 +211,14 @@ export const chooseBlessing = (
   }
 };
 
-const moves: MoveMap<GameState> = { moveUnit, attackUnit, waitUnit, chooseBlessing };
+const moves: MoveMap<GameState> = {
+  moveUnit,
+  attackUnit,
+  waitUnit,
+  chooseBlessing,
+  equipItem,
+  unequipItem,
+};
 
 export interface GameOver {
   winner: Team;

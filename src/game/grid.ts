@@ -1,5 +1,6 @@
 import type { GameState, Team, Terrain, Unit } from './types';
 import { TERRAIN } from './types';
+import { effectiveStats } from './equipment';
 
 export interface Coord {
   x: number;
@@ -54,6 +55,8 @@ export function computeReachable(G: GameState, unit: Unit): Map<string, Reachabl
 
   if (unit.hasMoved) return reachable;
 
+  const move = effectiveStats(unit).move;
+
   // Best known cost to *enter* a tile, including tiles we may only pass through.
   const best = new Map<string, number>([[tileKey(unit.x, unit.y), 0]]);
   const frontier: ReachableTile[] = [origin];
@@ -79,7 +82,7 @@ export function computeReachable(G: GameState, unit: Unit): Map<string, Reachabl
       if (occupant && occupant.team !== unit.team) continue;
 
       const cost = current.cost + terrain.moveCost;
-      if (cost > unit.move) continue;
+      if (cost > move) continue;
 
       const key = tileKey(x, y);
       if (cost >= (best.get(key) ?? Infinity)) continue;
@@ -97,8 +100,9 @@ export function computeReachable(G: GameState, unit: Unit): Map<string, Reachabl
 
 /** Enemies of `unit` that could be struck if it attacked from (x, y). */
 export function targetsFrom(G: GameState, unit: Unit, x: number, y: number): Unit[] {
+  const range = effectiveStats(unit).range;
   return Object.values(G.units).filter(
-    (other) => other.team !== unit.team && manhattan({ x, y }, other) <= unit.range,
+    (other) => other.team !== unit.team && manhattan({ x, y }, other) <= range,
   );
 }
 
@@ -112,10 +116,11 @@ export function computeThreatTiles(
   reachable: Map<string, ReachableTile>,
 ): Set<string> {
   const threatened = new Set<string>();
+  const range = effectiveStats(unit).range;
 
   for (const tile of reachable.values()) {
-    for (let dx = -unit.range; dx <= unit.range; dx++) {
-      const remaining = unit.range - Math.abs(dx);
+    for (let dx = -range; dx <= range; dx++) {
+      const remaining = range - Math.abs(dx);
       for (let dy = -remaining; dy <= remaining; dy++) {
         if (dx === 0 && dy === 0) continue;
         const x = tile.x + dx;

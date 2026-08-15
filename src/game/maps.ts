@@ -103,6 +103,7 @@ export function buildGameState(chapter: ChapterDef, random: ShuffleAPI): GameSta
       hasActed: false,
       level,
       exp: 0,
+      equipment: {},
     };
   }
 
@@ -116,6 +117,8 @@ export function buildGameState(chapter: ChapterDef, random: ShuffleAPI): GameSta
     log: ['Wave 1 Starts'],
     wave: 1,
     awaitingBlessing: false,
+    inventory: [],
+    nextItemInstance: 0,
   };
 }
 

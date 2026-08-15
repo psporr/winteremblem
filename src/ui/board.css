@@ -855,3 +855,135 @@ body {
   color: var(--ink-dim);
   font-size: 13px;
 }
+
+.we-overlay__card--inventory {
+  width: 100%;
+  max-width: 420px;
+  max-height: 82vh;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.we-overlay__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.we-overlay__header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.we-roster-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.we-roster-tab {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-edge);
+  background: var(--bg);
+  color: var(--ink-dim);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.we-roster-tab--active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.we-equip-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.we-equip-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-edge);
+  background: var(--bg);
+}
+
+.we-equip-slot__label {
+  flex-shrink: 0;
+  width: 74px;
+  color: var(--ink-dim);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.we-equip-slot__item {
+  flex: 1;
+  font-size: 13px;
+}
+
+.we-equip-slot__item em {
+  display: block;
+  color: var(--ink-dim);
+  font-style: normal;
+  font-size: 12px;
+}
+
+.we-equip-slot__empty {
+  flex: 1;
+  color: var(--ink-dim);
+  font-size: 13px;
+}
+
+.we-inventory-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+
+.we-inventory-empty {
+  margin: 0;
+  color: var(--ink-dim);
+  font-size: 13px;
+}
+
+.we-inventory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.we-inventory-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-edge);
+  background: var(--bg);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.we-inventory-item:hover {
+  border-color: var(--accent);
+}
+
+.we-inventory-item strong {
+  color: var(--accent);
+  font-size: 14px;
+}
+
+.we-inventory-item span {
+  color: var(--ink-dim);
+  font-size: 12px;
+}

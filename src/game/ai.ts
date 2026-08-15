@@ -1,6 +1,7 @@
 import type { GameState, Team, Unit } from './types';
 import { computeReachable, manhattan, unitsOf, type ReachableTile } from './grid';
 import { forecastCombat } from './combat';
+import { effectiveStats } from './equipment';
 
 export type AiAction =
   | { type: 'move'; unitId: string; x: number; y: number }
@@ -36,11 +37,12 @@ function opposing(team: Team): Team {
 
 function bestAttack(G: GameState, unit: Unit, reachable: Map<string, ReachableTile>): AttackPlan | null {
   const foes = unitsOf(G, opposing(unit.team));
+  const range = effectiveStats(unit).range;
   let best: AttackPlan | null = null;
 
   for (const tile of reachable.values()) {
     for (const target of foes) {
-      if (manhattan(tile, target) > unit.range) continue;
+      if (manhattan(tile, target) > range) continue;
 
       const score = scoreAttack(G, unit, tile, target);
       if (!best || score > best.score) {
