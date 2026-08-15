@@ -37,9 +37,10 @@ Command flow follows classic Fire Emblem, tuned for touch:
   moving. A floating menu appears beside the unit showing only what's actually
   possible from that position: **Attack** (only if an enemy is in range) and
   **Wait**.
-- **Tap Attack** to highlight valid targets in red, then tap one to preview the
-  exchange — damage dealt, HP remaining, and counter damage — before **Confirm**
-  commits it. **Cancel** backs out to target selection.
+- **Tap Attack** to highlight valid targets in red, then tap one to bring up a
+  Fire Emblem-style forecast card — both units' portraits, HP counting down to
+  their post-combat values, attack/counter damage — before **Confirm** commits
+  it. **Cancel** backs out to target selection.
 - **Tap Back** in the menu to undo the move entirely and reconsider — the unit
   returns to where it started, free to move again.
 - **Wait** ends a unit's turn where it stands. The phase ends automatically once

@@ -498,15 +498,120 @@ body {
   font-weight: 600;
 }
 
-.we-menu--confirm {
-  width: 150px;
-  font-size: 12px;
+/* FE-style forecast card: two portraits facing off, HP arrows, the stat
+   each side's number came from. Same visual treatment as .we-menu (card,
+   border, mount animation) but wide enough for both sides. */
+.we-forecast-card {
+  position: absolute;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 220px;
+  padding: 10px;
+  background: rgba(22, 32, 47, 0.92);
+  border: 1px solid var(--panel-edge);
+  backdrop-filter: blur(3px);
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  animation: we-menu-in 140ms ease;
 }
 
-.we-menu__forecast-row {
+@media (prefers-reduced-motion: reduce) {
+  .we-forecast-card {
+    animation: none;
+  }
+}
+
+.we-panel-anchor--right .we-forecast-card {
+  left: calc(var(--tile) + 8px);
+}
+
+.we-panel-anchor--left .we-forecast-card {
+  left: calc(-220px - 8px);
+}
+
+.we-forecast-card__matchup {
   display: flex;
-  justify-content: space-between;
-  padding: 1px 0;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.we-forecast-card__vs {
+  align-self: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-dim);
+}
+
+.we-forecast-side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.we-forecast-side__nameplate {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.we-forecast-side--player .we-forecast-side__nameplate {
+  background: var(--accent);
+  color: #0d1420;
+}
+
+.we-forecast-side--enemy .we-forecast-side__nameplate {
+  background: var(--danger);
+  color: #0d1420;
+}
+
+.we-forecast-side__portrait {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.we-forecast-side--enemy .we-unit__sprite {
+  filter: grayscale(0.25) sepia(1) hue-rotate(-50deg) saturate(3.5) brightness(0.95);
+}
+
+.we-unit__sprite--static {
+  animation: none;
+  background-position: 0 0;
+}
+
+.we-forecast-side__hp {
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.we-forecast-side__arrow {
+  color: var(--ink-dim);
+  font-weight: 400;
+}
+
+.we-forecast-side__hp-zero {
+  color: var(--danger);
+}
+
+.we-forecast-side__stat {
+  font-size: 11px;
+  color: var(--ink-dim);
 }
 
 .we-menu__kill {

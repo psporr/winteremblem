@@ -427,18 +427,21 @@ function ActionPanel({
       )}
 
       {mode === 'confirm' && forecast && target && (
-        <div className="we-menu we-menu--confirm">
-          <div className="we-menu__forecast-row">
-            <span>{unit.name} deals</span>
-            <strong>{forecast.damageDealt}</strong>
-          </div>
-          <div className="we-menu__forecast-row">
-            <span>{target.name} left</span>
-            <strong>{forecast.defenderHpAfter}</strong>
-          </div>
-          <div className="we-menu__forecast-row">
-            <span>Counter</span>
-            <strong>{forecast.counterDamage ?? '—'}</strong>
+        <div className="we-forecast-card">
+          <div className="we-forecast-card__matchup">
+            <ForecastSide
+              unit={unit}
+              hpAfter={forecast.attackerWillDie ? 0 : forecast.attackerHpAfter}
+              statLabel="Atk"
+              statValue={forecast.damageDealt}
+            />
+            <span className="we-forecast-card__vs">VS</span>
+            <ForecastSide
+              unit={target}
+              hpAfter={forecast.defenderHpAfter}
+              statLabel={forecast.counterDamage !== null ? 'Counter' : 'No counter'}
+              statValue={forecast.counterDamage}
+            />
           </div>
           {forecast.willKill && <div className="we-menu__kill">Lethal</div>}
           {forecast.attackerWillDie && <div className="we-menu__danger">You would die</div>}
@@ -450,6 +453,64 @@ function ActionPanel({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * One side of the FE-style forecast card — portrait, name, HP transitioning
+ * to its post-combat value, and the stat that produced it (damage dealt or
+ * counter damage). The sprite is pinned to its first frame rather than idle-
+ * animating, so the card reads calmly instead of two characters twitching
+ * mid-decision.
+ */
+function ForecastSide({
+  unit,
+  hpAfter,
+  statLabel,
+  statValue,
+}: {
+  unit: Unit;
+  hpAfter: number;
+  statLabel: string;
+  statValue: number | null;
+}) {
+  const sprite = UNIT_SPRITES[unit.className];
+  const hpChanges = hpAfter !== unit.hp;
+
+  return (
+    <div className={`we-forecast-side we-forecast-side--${unit.team}`}>
+      <div className="we-forecast-side__nameplate">{unit.name}</div>
+      <div className="we-forecast-side__portrait">
+        {sprite ? (
+          <span
+            className="we-unit__sprite we-unit__sprite--static"
+            style={
+              {
+                '--frame-w': `${sprite.frameWidth}px`,
+                '--frame-h': `${sprite.frameHeight}px`,
+                '--frame-count': sprite.frames,
+                '--sprite-src': `url(${sprite.src})`,
+                '--sprite-scale': 34 / sprite.frameHeight,
+              } as CSSProperties
+            }
+          />
+        ) : (
+          <span className="we-unit__glyph">{unit.name.charAt(0)}</span>
+        )}
+      </div>
+      <div className="we-forecast-side__hp">
+        {unit.hp}
+        {hpChanges && (
+          <>
+            <span className="we-forecast-side__arrow">→</span>
+            <strong className={hpAfter === 0 ? 'we-forecast-side__hp-zero' : ''}>{hpAfter}</strong>
+          </>
+        )}
+      </div>
+      <div className="we-forecast-side__stat">
+        {statLabel} {statValue ?? '—'}
+      </div>
     </div>
   );
 }
