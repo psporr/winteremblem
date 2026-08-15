@@ -653,30 +653,41 @@ function UnitToken({
     'we-unit',
     `we-unit--${unit.team}`,
     unit.hasActed ? 'we-unit--spent' : '',
-    sprite ? '' : 'we-unit--glyph',
     shaking ? 'we-unit--shake' : '',
+  ].filter(Boolean);
+
+  const artClasses = ['we-unit__art', sprite ? '' : 'we-unit__art--glyph'].filter(Boolean);
+
+  const hpFillClasses = [
+    'we-unit__hp-fill',
+    hpRatio <= 0.3 ? 'we-unit__hp-fill--low' : hpRatio <= 0.6 ? 'we-unit__hp-fill--mid' : '',
   ].filter(Boolean);
 
   return (
     <div className={classes.join(' ')}>
-      {sprite ? (
-        <span
-          className="we-unit__sprite"
-          style={
-            {
-              '--frame-w': `${sprite.frameWidth}px`,
-              '--frame-h': `${sprite.frameHeight}px`,
-              '--frame-count': sprite.frames,
-              '--sprite-src': `url(${sprite.src})`,
-              '--sprite-scale': SPRITE_DISPLAY_HEIGHT / sprite.frameHeight,
-            } as CSSProperties
-          }
-        />
-      ) : (
-        <span className="we-unit__glyph">{unit.name.charAt(0)}</span>
-      )}
+      {/* Dimming for a spent unit lives here, not on .we-unit itself, so it
+          only affects the character art — the HP bar and damage numbers
+          below stay fully visible and legible either way. */}
+      <span className={artClasses.join(' ')}>
+        {sprite ? (
+          <span
+            className="we-unit__sprite"
+            style={
+              {
+                '--frame-w': `${sprite.frameWidth}px`,
+                '--frame-h': `${sprite.frameHeight}px`,
+                '--frame-count': sprite.frames,
+                '--sprite-src': `url(${sprite.src})`,
+                '--sprite-scale': SPRITE_DISPLAY_HEIGHT / sprite.frameHeight,
+              } as CSSProperties
+            }
+          />
+        ) : (
+          <span className="we-unit__glyph">{unit.name.charAt(0)}</span>
+        )}
+      </span>
       <span className="we-unit__hp">
-        <span className="we-unit__hp-fill" style={{ width: `${hpRatio * 100}%` }} />
+        <span className={hpFillClasses.join(' ')} style={{ width: `${hpRatio * 100}%` }} />
       </span>
       {floatingNumber != null && (
         <span
