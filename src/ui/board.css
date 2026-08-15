@@ -287,6 +287,20 @@ body {
   overflow: hidden;
 }
 
+/* The fill still uses the universal green/yellow/red damage-severity
+   colors — only the border is team-tinted, so a spent player unit and a
+   spent enemy unit (both dimmed the same way) stay tellable apart at a
+   glance instead of reading as identical grey bars. */
+.we-unit--player .we-unit__hp {
+  border-width: 1.5px;
+  border-color: #6ea8fe;
+}
+
+.we-unit--enemy .we-unit__hp {
+  border-width: 1.5px;
+  border-color: #f0616d;
+}
+
 .we-unit__hp-fill {
   display: block;
   height: 100%;
