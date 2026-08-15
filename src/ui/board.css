@@ -78,6 +78,7 @@ body {
 }
 
 .we-iconbutton--icon {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -85,6 +86,25 @@ body {
   height: 36px;
   padding: 0;
   border-radius: 50%;
+}
+
+/* Flags gear waiting to be equipped — the icon alone has no text label, and
+   its title tooltip only ever shows on hover, which doesn't exist on the
+   touch devices this game targets, so a silent icon is easy to miss. */
+.we-iconbutton__badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
 }
 
 .we-layout {

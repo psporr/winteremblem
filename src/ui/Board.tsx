@@ -320,7 +320,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
             <button
               type="button"
               className="we-iconbutton we-iconbutton--icon"
-              aria-label="Squad & inventory"
+              aria-label={`Squad & inventory${G.inventory.length > 0 ? ` (${G.inventory.length} item${G.inventory.length === 1 ? '' : 's'} to equip)` : ''}`}
               title="Squad & inventory"
               onClick={() => {
                 setInventoryUnitId((current) => current ?? selectedId ?? unitsOf(G, 'player')[0]?.id ?? null);
@@ -333,6 +333,9 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                   d="M9 2a1 1 0 0 0-1 1v1H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V3a1 1 0 0 0-1-1H9zm1 2h4v1h-4V4zM6 8h12v11H6V8zm3 2v2h2v-2H9zm4 0v2h2v-2h-2z"
                 />
               </svg>
+              {G.inventory.length > 0 && (
+                <span className="we-iconbutton__badge">{G.inventory.length}</span>
+              )}
             </button>
           )}
           {isPlayerPhase && mode !== 'animating' && (
