@@ -119,9 +119,13 @@ artwork drawn for this project. See [CREDITS.md](CREDITS.md).
 
 - v1 (current): wave-survival on one 6x8 map (portrait, matching Fire Emblem
   Heroes' grid size so the board fits a mobile viewport without horizontal
-  scrolling). Squad is Lyn/Byleth/Corrin/Selva (one of each class) vs waves of
-  randomly-classed, difficulty-scaled Bandits, local play
+  scrolling). Squad is Lyn (Swordsman), Byleth (Archer), Corrin (Lancer),
+  Selva (Mage), Ake (Barbarian), Lissa (Cleric), Olivia (Dancer) vs waves of
+  randomly-classed, difficulty-scaled Bandits drawing from the same 7-class
+  pool, local play. Every class has real sprite art
 - Next: shop + equipment system (replacing/extending the simple blessing
-  picks), Lancer and Mage sprites, Firebase Auth + Firestore save/resume
+  picks), Firebase Auth + Firestore save/resume, real Cleric (healing) and
+  Dancer (refresh an ally) abilities — both currently fight as ordinary
+  combatants, their classic FE roles aren't implemented yet
 - Later: weapon triangle, more maps
 - Later: online co-op for 5 players

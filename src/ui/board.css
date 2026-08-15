@@ -124,6 +124,12 @@ body {
   width: var(--tile);
   height: var(--tile);
   transition: transform 260ms ease;
+  /* .we-unit fills this slot exactly, so this centering only matters as a
+     safety net — but without it, any child smaller than the slot defaults
+     to top-left alignment instead of true center. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -191,26 +197,32 @@ body {
 .we-unit {
   position: relative;
   z-index: 1;
-  width: 82%;
-  height: 82%;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
+  justify-content: flex-end;
+  padding-top: 1px;
+  gap: 1px;
   font-weight: 700;
   color: #0d1420;
 }
 
 /* Wraps just the sprite/glyph, separate from the HP bar and floating
    numbers below, so the "spent" dimming (and the glyph fallback's colored
-   background) never bleeds onto them. */
+   background) never bleeds onto them. flex: 1 claims all the space above
+   the HP bar, so the sprite — deliberately sized close to the tile itself —
+   centers within (and can slightly overlap) that space rather than the HP
+   bar getting pushed down or the sprite getting clipped. */
 .we-unit__art {
   display: flex;
   align-items: center;
   justify-content: center;
   flex: 1;
   min-height: 0;
+  width: 100%;
+  overflow: visible;
 }
 
 .we-unit__art--glyph {
