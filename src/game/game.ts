@@ -10,7 +10,7 @@ import { BLESSINGS } from './blessings';
 import { spawnWave } from './waves';
 import { EXP_PER_ATTACK, EXP_TO_LEVEL, statsAtLevel } from './classes';
 import { effectiveStats, ITEMS, rollDrop, type DropRandomAPI } from './equipment';
-import { HEAL_BONUS, NOVA_DAMAGE_MULTIPLIER, SKILLS, SNIPE_BONUS, skillAoeTargets, skillTargets } from './skills';
+import { HEAL_BONUS, NOVA_DAMAGE_MULTIPLIER, SKILLS, SNIPE_BONUS, novaBlastTargets, skillTargets } from './skills';
 
 /**
  * The slice of boardgame.io's EventsAPI we actually need. Defined locally,
@@ -242,16 +242,19 @@ export const useSkill = (
     }
 
     case 'nova': {
-      const targets = skillAoeTargets(G, unit);
-      if (targets.length === 0) return INVALID_MOVE;
+      if (!target || !skillTargets(G, unit).some((candidate) => candidate.id === target.id)) return INVALID_MOVE;
+      const hits = novaBlastTargets(G, unit, target);
       let totalDealt = 0;
-      for (const aoeTarget of targets) {
-        const dmg = Math.max(1, Math.round(computeDamage(G, unit, aoeTarget) * NOVA_DAMAGE_MULTIPLIER));
-        aoeTarget.hp = Math.max(0, aoeTarget.hp - dmg);
+      for (const hitTarget of hits) {
+        const dmg = Math.max(1, Math.round(computeDamage(G, unit, hitTarget) * NOVA_DAMAGE_MULTIPLIER));
+        hitTarget.hp = Math.max(0, hitTarget.hp - dmg);
         totalDealt += dmg;
-        if (aoeTarget.hp <= 0) killUnit(G, aoeTarget, random);
+        if (hitTarget.hp <= 0) killUnit(G, hitTarget, random);
       }
-      pushLog(G, `${unit.name} casts Nova, hitting ${targets.length} enemies for ${totalDealt} total.`);
+      pushLog(
+        G,
+        `${unit.name} casts Nova on ${target.name}, hitting ${hits.length} enem${hits.length === 1 ? 'y' : 'ies'} for ${totalDealt} total.`,
+      );
       break;
     }
 

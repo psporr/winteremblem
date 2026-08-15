@@ -1,17 +1,17 @@
 import type { ClassName } from './classes';
 import type { GameState, Unit } from './types';
 import { effectiveStats } from './equipment';
-import { manhattan, unitsOf } from './grid';
+import { manhattan, unitsOf, type Coord } from './grid';
 import { computeDamage } from './combat';
 
 /** Flat bonus healed on top of the healer's own atk. */
 export const HEAL_BONUS = 4;
 /** Flat bonus damage Snipe deals on top of a normal hit. */
 export const SNIPE_BONUS = 4;
-/** Nova's per-target damage multiplier — an AoE hits everyone, so each hit is softened. */
+/** Nova's per-target damage multiplier — a blast hits several tiles, so each hit is softened. */
 export const NOVA_DAMAGE_MULTIPLIER = 0.6;
 
-export type SkillTargetType = 'ally' | 'enemy' | 'enemy-aoe';
+export type SkillTargetType = 'ally' | 'enemy';
 
 export interface SkillDef {
   id: string;
@@ -78,9 +78,9 @@ export const SKILLS: Record<ClassName, SkillDef> = {
   Mage: {
     id: 'nova',
     name: 'Nova',
-    description: 'Hits every enemy in range at once, for reduced damage each.',
+    description: 'A plus-shaped blast centered on the target, for reduced damage each.',
     cooldown: SKILL_COOLDOWN,
-    targetType: 'enemy-aoe',
+    targetType: 'enemy',
     rangeBonus: 0,
   },
   Barbarian: {
@@ -98,16 +98,10 @@ export function skillRange(unit: Unit): number {
   return effectiveStats(unit).range + SKILLS[unit.className].rangeBonus;
 }
 
-/**
- * Valid single-select targets for a unit's skill from its current tile.
- * Always empty for AoE skills (see skillAoeTargets instead) — there's
- * nothing to pick, the skill just hits everything in range.
- */
+/** Valid single-select targets for a unit's skill from its current tile. */
 export function skillTargets(G: GameState, unit: Unit): Unit[] {
   const skill = SKILLS[unit.className];
   const range = skillRange(unit);
-
-  if (skill.targetType === 'enemy-aoe') return [];
 
   if (skill.targetType === 'ally') {
     const allies = unitsOf(G, unit.team).filter(
@@ -123,21 +117,29 @@ export function skillTargets(G: GameState, unit: Unit): Unit[] {
   );
 }
 
-/** Enemies an AoE skill (Nova) would hit from the unit's current tile. */
-export function skillAoeTargets(G: GameState, unit: Unit): Unit[] {
-  const range = skillRange(unit);
+/** The five tiles a plus-shaped blast covers, centered on the picked target. */
+export function novaBlastCoords(target: Coord): Coord[] {
+  return [
+    { x: target.x, y: target.y },
+    { x: target.x, y: target.y - 1 },
+    { x: target.x, y: target.y + 1 },
+    { x: target.x - 1, y: target.y },
+    { x: target.x + 1, y: target.y },
+  ];
+}
+
+/** Enemies of `unit` caught in Nova's plus-shaped blast around `target`. */
+export function novaBlastTargets(G: GameState, unit: Unit, target: Coord): Unit[] {
+  const coords = novaBlastCoords(target);
   return Object.values(G.units).filter(
-    (other) => other.team !== unit.team && manhattan(unit, other) <= range,
+    (other) => other.team !== unit.team && coords.some((c) => c.x === other.x && c.y === other.y),
   );
 }
 
 /** Whether a unit's skill has any legal use right now — cooldown and targets both. */
 export function canUseSkill(G: GameState, unit: Unit): boolean {
   if (unit.skillCooldown > 0) return false;
-  const skill = SKILLS[unit.className];
-  return skill.targetType === 'enemy-aoe'
-    ? skillAoeTargets(G, unit).length > 0
-    : skillTargets(G, unit).length > 0;
+  return skillTargets(G, unit).length > 0;
 }
 
 /**
@@ -146,12 +148,7 @@ export function canUseSkill(G: GameState, unit: Unit): boolean {
  * damage/heal formulas the actual move applies (HEAL_BONUS, SNIPE_BONUS,
  * NOVA_DAMAGE_MULTIPLIER) so the preview can't drift from what happens.
  */
-export function describeSkillEffect(
-  G: GameState,
-  unit: Unit,
-  target: Unit | null,
-  aoeTargets: Unit[],
-): string {
+export function describeSkillEffect(G: GameState, unit: Unit, target: Unit | null): string {
   const skill = SKILLS[unit.className];
 
   switch (skill.id) {
@@ -177,10 +174,11 @@ export function describeSkillEffect(
       const dmg = computeDamage(G, unit, target) + SNIPE_BONUS;
       return `${dmg} damage. Target cannot counter.`;
     }
-    case 'nova':
-      return aoeTargets.length > 0
-        ? `Hits ${aoeTargets.length} enem${aoeTargets.length === 1 ? 'y' : 'ies'} for reduced damage each.`
-        : 'No enemies in range.';
+    case 'nova': {
+      if (!target) return '';
+      const hits = novaBlastTargets(G, unit, target);
+      return `Hits ${hits.length} enem${hits.length === 1 ? 'y' : 'ies'} in a plus-shaped blast, for reduced damage each.`;
+    }
     case 'rampage': {
       if (!target) return '';
       const dmg = computeDamage(G, unit, target);

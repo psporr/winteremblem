@@ -20,7 +20,7 @@ import { decideEnemyAction } from '../game/ai';
 import { BLESSINGS } from '../game/blessings';
 import { EXP_TO_LEVEL } from '../game/classes';
 import { effectiveStats, ITEMS } from '../game/equipment';
-import { SKILLS, canUseSkill, describeSkillEffect, skillAoeTargets, skillTargets, type SkillDef } from '../game/skills';
+import { SKILLS, canUseSkill, describeSkillEffect, novaBlastCoords, skillTargets, type SkillDef } from '../game/skills';
 import type { ItemSlot } from '../game/types';
 import type { GameOver } from '../game/game';
 import pkg from '../../package.json';
@@ -132,23 +132,26 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   );
 
   const skillDef = selected ? SKILLS[selected.className] : null;
-  const skillIsAoe = skillDef?.targetType === 'enemy-aoe';
 
-  // Single-select skill targets (empty for Nova, the only AoE skill — see
-  // skillAoeList below instead).
   const skillTargetList = useMemo(
-    () => (selected && isPlayerPhase && !skillIsAoe ? skillTargets(G, selected) : []),
-    [G, selected, isPlayerPhase, skillIsAoe],
+    () => (selected && isPlayerPhase ? skillTargets(G, selected) : []),
+    [G, selected, isPlayerPhase],
   );
   const skillTargetIds = useMemo(
     () => new Set(skillTargetList.map((unit) => unit.id)),
     [skillTargetList],
   );
-  const skillAoeList = useMemo(
-    () => (selected && isPlayerPhase && skillIsAoe ? skillAoeTargets(G, selected) : []),
-    [G, selected, isPlayerPhase, skillIsAoe],
-  );
   const canSkill = selected && isPlayerPhase ? canUseSkill(G, selected) : false;
+
+  // Nova's plus-shaped blast around whichever target is currently pending
+  // confirmation — previewed on the board so the player sees exactly which
+  // tiles are about to get hit before committing.
+  const novaBlastTiles = useMemo(() => {
+    if (mode !== 'skill-confirm' || skillDef?.id !== 'nova' || !pendingTargetId) return new Set<string>();
+    const target = G.units[pendingTargetId];
+    if (!target) return new Set<string>();
+    return new Set(novaBlastCoords(target).map((c) => tileKey(c.x, c.y)));
+  }, [G, mode, skillDef, pendingTargetId]);
 
   const threatTiles = useMemo(() => {
     if (!showThreat) return new Set<string>();
@@ -232,9 +235,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   }
 
   function handleSkillPressed() {
-    // Nova has nothing to pick — it always hits every enemy in range, so
-    // skip straight to confirming rather than a targeting step with no target.
-    setMode(skillIsAoe ? 'skill-confirm' : 'skill-targeting');
+    setMode('skill-targeting');
   }
 
   function handleWaitPressed() {
@@ -259,19 +260,18 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
 
   function handleCancelSkillConfirm() {
     setPendingTargetId(null);
-    setMode(skillIsAoe ? 'menu' : 'skill-targeting');
+    setMode('skill-targeting');
   }
 
   /**
    * Skills resolve instantly rather than playing out in animated beats the
    * way a confirmed attack does — there's no single shared shape across
-   * heal/refresh/double-strike/AoE to animate uniformly, and the HP bars
+   * heal/refresh/double-strike/blast to animate uniformly, and the HP bars
    * still transition smoothly on their own via CSS.
    */
   function handleConfirmSkill() {
-    if (!selected) return;
-    if (!skillIsAoe && !pendingTargetId) return;
-    moves.useSkill(selected.id, skillIsAoe ? null : pendingTargetId);
+    if (!selected || !pendingTargetId) return;
+    moves.useSkill(selected.id, pendingTargetId);
     clearSelection();
   }
 
@@ -451,6 +451,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 if (mode === 'skill-targeting' && occupant && skillTargetIds.has(occupant.id)) {
                   classes.push(skillDef?.targetType === 'ally' ? 'we-tile--support' : 'we-tile--attack');
                 }
+                if (novaBlastTiles.has(key)) classes.push('we-tile--blast');
                 if (selected && selected.x === x && selected.y === y) {
                   classes.push('we-tile--selected');
                 }
@@ -534,8 +535,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 G={G}
                 unit={selected}
                 skill={skillDef}
-                target={skillIsAoe ? null : pendingTargetId ? G.units[pendingTargetId] : undefined}
-                aoeTargets={skillAoeList}
+                target={pendingTargetId ? G.units[pendingTargetId] : undefined}
                 onConfirm={handleConfirmSkill}
                 onCancel={handleCancelSkillConfirm}
               />
@@ -893,7 +893,6 @@ function SkillConfirmCard({
   unit,
   skill,
   target,
-  aoeTargets,
   onConfirm,
   onCancel,
 }: {
@@ -901,11 +900,10 @@ function SkillConfirmCard({
   unit: Unit;
   skill: SkillDef;
   target: Unit | null | undefined;
-  aoeTargets: Unit[];
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  const preview = describeSkillEffect(G, unit, target ?? null, aoeTargets);
+  const preview = describeSkillEffect(G, unit, target ?? null);
 
   return (
     <div className="we-forecast-card we-skill-card">

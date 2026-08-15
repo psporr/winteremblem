@@ -83,7 +83,8 @@ third option next to Attack/Wait, on a 3-turn cooldown after use. Cleric
 heals an ally, Dancer refreshes one so they can act again, and the other
 five each bend a different attack rule: Swordsman hits twice, Lancer
 ignores terrain defense, Archer's Snipe reaches a tile further and can't be
-countered, Mage's Nova hits every enemy in range at once, and Barbarian's
+countered, Mage's Nova hits a target and the four tiles orthogonally
+adjacent to it (a plus-shaped blast) at once, and Barbarian's
 Rampage refunds the turn on a kill. Support skills (Heal, Dance) target
 allies; the rest target enemies the same way Attack does.
 
