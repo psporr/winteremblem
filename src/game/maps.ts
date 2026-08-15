@@ -104,6 +104,7 @@ export function buildGameState(chapter: ChapterDef, random: ShuffleAPI): GameSta
       level,
       exp: 0,
       equipment: {},
+      skillCooldown: 0,
     };
   }
 

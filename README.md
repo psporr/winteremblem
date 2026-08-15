@@ -35,12 +35,17 @@ Command flow follows classic Fire Emblem, tuned for touch:
   forest costs 2 movement, walls are impassable, enemies block movement.
 - **Tap a tile to move there** — including the unit's own tile, to act without
   moving. A floating menu appears beside the unit showing only what's actually
-  possible from that position: **Attack** (only if an enemy is in range) and
-  **Wait**.
+  possible from that position: **Attack** (only if an enemy is in range), the
+  unit's own **skill** (named after itself — Heal, Dance, Snipe, etc. — shown
+  only when it's off cooldown and has a legal target), and **Wait**.
 - **Tap Attack** to highlight valid targets in red, then tap one to bring up a
   Fire Emblem-style forecast card — both units' portraits, HP counting down to
   their post-combat values, attack/counter damage — before **Confirm** commits
   it. **Cancel** backs out to target selection.
+- **Tap a skill** to highlight its valid targets — red for an enemy skill,
+  green for an ally one (Heal, Dance) — then tap one for a plain-text preview
+  card before **Confirm**. Skills resolve instantly, no animated beats, and go
+  on a 3-turn cooldown after use.
 - **Confirming a player attack plays it out in beats**, not instantly: the hit
   lands (floating damage number, HP bar drains, a brief shake), then — if the
   target survives and can strike back — the counter lands the same way, before
@@ -71,8 +76,16 @@ so the level gap only narrows as a run goes on.
 accessory — the chance and the drop's slot both scale with wave number, so
 late-run kills pay off more. Drops land in a shared squad inventory; open it
 with the bag icon (top right, player phase only) to equip gear onto any unit
-or send a piece back to the inventory. Equipping doesn't cost a turn. No
-skill system yet — that's next.
+or send a piece back to the inventory. Equipping doesn't cost a turn.
+
+**Skills.** Every class has one active skill available from level 1 — a
+third option next to Attack/Wait, on a 3-turn cooldown after use. Cleric
+heals an ally, Dancer refreshes one so they can act again, and the other
+five each bend a different attack rule: Swordsman hits twice, Lancer
+ignores terrain defense, Archer's Snipe reaches a tile further and can't be
+countered, Mage's Nova hits every enemy in range at once, and Barbarian's
+Rampage refunds the turn on a kill. Support skills (Heal, Dance) target
+allies; the rest target enemies the same way Attack does.
 
 ## Project layout
 
@@ -81,6 +94,7 @@ src/game/     rules layer — no React, no rendering
   types.ts       state model, terrain table, item/equipment types
   classes.ts     per-class base stats, the level/stat growth curve, EXP constants
   equipment.ts   item catalog, effective-stats calculation, drop rolls
+  skills.ts      per-class active skill definitions, targeting, effect previews
   maps.ts        ASCII chapter definitions -> initial state
   grid.ts        Dijkstra movement range, attack/threat range
   combat.ts      damage and counterattack forecasting
@@ -131,11 +145,10 @@ artwork drawn for this project. See [CREDITS.md](CREDITS.md).
   Byleth (Archer), Corrin (Lancer), Selva (Mage), Ake (Barbarian), Lissa
   (Cleric), Olivia (Dancer) vs waves of randomly-classed, difficulty-scaled
   Bandits drawing from the same 7-class pool, local play. Every class has
-  real sprite art. Drop-based equipment (weapon/armor/accessory) layers
-  on top of the blessing picks rather than replacing them
-- Next: passive skills (unlocked on level-up, same pick-a-card interaction
-  as blessings), Firebase Auth + Firestore save/resume, real Cleric (healing)
-  and Dancer (refresh an ally) abilities — both currently fight as ordinary
-  combatants, their classic FE roles aren't implemented yet
-- Later: active/cooldown skills, weapon triangle, more maps
+  real sprite art and its own active skill from level 1. Drop-based
+  equipment (weapon/armor/accessory) layers on top of the blessing picks
+  rather than replacing them
+- Next: Firebase Auth + Firestore save/resume, enemy AI using skills too
+  (currently player-only)
+- Later: weapon triangle, more maps
 - Later: online co-op for 5 players

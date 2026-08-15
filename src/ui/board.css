@@ -208,6 +208,12 @@ body {
   box-shadow: inset 0 0 0 3px var(--danger);
 }
 
+/* Ally-targeting skills (Heal, Dance) get their own highlight color so they
+   read as "help" rather than "harm" at a glance, distinct from we-tile--attack. */
+.we-tile--support {
+  box-shadow: inset 0 0 0 3px #4ad991;
+}
+
 .we-tile--selected {
   box-shadow: inset 0 0 0 3px #ffd479;
 }
@@ -514,6 +520,25 @@ body {
   font-size: 12px;
 }
 
+.we-panel__skill {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 12px;
+}
+
+.we-panel__skill strong {
+  color: var(--accent);
+}
+
+.we-panel__skill span {
+  color: var(--ink-dim);
+}
+
 .we-panel__terrain {
   margin-top: 10px;
   font-size: 12px;
@@ -694,6 +719,18 @@ body {
   .we-forecast-card {
     animation: none;
   }
+}
+
+.we-skill-card__title {
+  font-weight: 700;
+  font-size: 15px;
+  text-align: center;
+}
+
+.we-skill-card__preview {
+  color: var(--ink-dim);
+  font-size: 13px;
+  text-align: center;
 }
 
 .we-forecast-card__matchup {

@@ -64,6 +64,8 @@ export interface Unit {
   exp: number;
   /** Only ever populated for player units — enemies never carry loot. */
   equipment: EquipmentSlots;
+  /** Turns until this unit's class skill is usable again. 0 = ready. */
+  skillCooldown: number;
 }
 
 export interface GameState {

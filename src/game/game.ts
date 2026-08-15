@@ -5,11 +5,12 @@ import type { GameState, ItemSlot, Team, Unit } from './types';
 import { PLAYER_ID, teamOf } from './types';
 import { buildGameState, playerStartPositions, CHAPTER_1, type ShuffleAPI } from './maps';
 import { computeReachable, manhattan, tileKey, unitsOf } from './grid';
-import { forecastCombat } from './combat';
+import { canCounter, computeDamage, forecastCombat } from './combat';
 import { BLESSINGS } from './blessings';
 import { spawnWave } from './waves';
 import { EXP_PER_ATTACK, EXP_TO_LEVEL, statsAtLevel } from './classes';
 import { effectiveStats, ITEMS, rollDrop, type DropRandomAPI } from './equipment';
+import { HEAL_BONUS, NOVA_DAMAGE_MULTIPLIER, SKILLS, SNIPE_BONUS, skillAoeTargets, skillTargets } from './skills';
 
 /**
  * The slice of boardgame.io's EventsAPI we actually need. Defined locally,
@@ -66,6 +67,43 @@ function checkWaveCleared(G: GameState): void {
 }
 
 /**
+ * Removes a fallen unit, rolls its loot if it was an enemy, and checks
+ * whether that was the wave's last one. Shared by plain attacks and any
+ * skill that can kill, so drops and the wave-clear check never drift out of
+ * sync between the two.
+ */
+function killUnit(G: GameState, unit: Unit, random: DropRandomAPI): void {
+  pushLog(G, `${unit.name} has fallen!`);
+  delete G.units[unit.id];
+  if (unit.team === 'enemy') {
+    const drop = rollDrop(G, G.wave, random);
+    if (drop) {
+      G.inventory.push(drop);
+      pushLog(G, `${unit.name} dropped ${ITEMS[drop.defId].name}!`);
+    }
+  }
+  checkWaveCleared(G);
+}
+
+/**
+ * Shared counter step for skills that behave like a modified single attack
+ * (Sword Dance, Guard Break, Rampage). Returns false if the attacker died to
+ * the counter — the caller should stop immediately in that case, same as
+ * attackUnit does for a plain attack.
+ */
+function resolveSkillCounter(G: GameState, attacker: Unit, target: Unit, random: DropRandomAPI): boolean {
+  if (!canCounter(attacker, target)) return true;
+  const counter = computeDamage(G, target, attacker);
+  attacker.hp = Math.max(0, attacker.hp - counter);
+  pushLog(G, `${target.name} counters for ${counter}.`);
+  if (attacker.hp <= 0) {
+    killUnit(G, attacker, random);
+    return false;
+  }
+  return true;
+}
+
+/**
  * Every attack grants EXP to whoever threw the punch, win or lose. A level
  * up recomputes atk/def/maxHp from the class curve and heals by the maxHp
  * gained, so leveling never feels like a step backwards. Looped rather than
@@ -104,23 +142,12 @@ export const attackUnit = (
   pushLog(G, `${attacker.name} hits ${target.name} for ${result.damageDealt}.`);
 
   if (result.willKill) {
-    pushLog(G, `${target.name} has fallen!`);
-    delete G.units[targetId];
-    if (target.team === 'enemy') {
-      const drop = rollDrop(G, G.wave, random);
-      if (drop) {
-        G.inventory.push(drop);
-        pushLog(G, `${target.name} dropped ${ITEMS[drop.defId].name}!`);
-      }
-    }
-    checkWaveCleared(G);
+    killUnit(G, target, random);
   } else if (result.counterDamage !== null) {
     attacker.hp = result.attackerHpAfter;
     pushLog(G, `${target.name} counters for ${result.counterDamage}.`);
     if (result.attackerWillDie) {
-      pushLog(G, `${attacker.name} has fallen!`);
-      delete G.units[attackerId];
-      checkWaveCleared(G);
+      killUnit(G, attacker, random);
       return;
     }
   }
@@ -137,6 +164,119 @@ export const waitUnit = ({ G, ctx }: { G: GameState; ctx: Ctx }, unitId: string)
   const unit = activeUnit(G, ctx, unitId);
   if (!unit) return INVALID_MOVE;
 
+  unit.hasMoved = true;
+  unit.hasActed = true;
+};
+
+/**
+ * Every class's active skill, dispatched from one move since each case is
+ * short and they share the activeUnit/cooldown gate. `targetId` is null for
+ * Nova, the only AoE skill — there's nothing to pick, it just hits
+ * everything in range.
+ */
+export const useSkill = (
+  { G, ctx, random }: { G: GameState; ctx: Ctx; random: DropRandomAPI },
+  unitId: string,
+  targetId: string | null,
+) => {
+  const unit = activeUnit(G, ctx, unitId);
+  if (!unit || unit.skillCooldown > 0) return INVALID_MOVE;
+
+  const skill = SKILLS[unit.className];
+  const target = targetId ? G.units[targetId] : undefined;
+
+  switch (skill.id) {
+    case 'heal': {
+      if (!target || !skillTargets(G, unit).some((candidate) => candidate.id === target.id)) return INVALID_MOVE;
+      const healAmount = Math.min(target.maxHp - target.hp, unit.atk + HEAL_BONUS);
+      target.hp += healAmount;
+      pushLog(G, `${unit.name} heals ${target.name} for ${healAmount}.`);
+      break;
+    }
+
+    case 'dance': {
+      if (!target || !skillTargets(G, unit).some((candidate) => candidate.id === target.id)) return INVALID_MOVE;
+      target.hasMoved = false;
+      target.hasActed = false;
+      pushLog(G, `${unit.name} dances for ${target.name} — they can act again!`);
+      break;
+    }
+
+    case 'sword-dance': {
+      if (!target || !skillTargets(G, unit).some((candidate) => candidate.id === target.id)) return INVALID_MOVE;
+      let dealt = 0;
+      for (let i = 0; i < 2 && target.hp > 0; i++) {
+        const dmg = computeDamage(G, unit, target);
+        target.hp = Math.max(0, target.hp - dmg);
+        dealt += dmg;
+      }
+      pushLog(G, `${unit.name} strikes ${target.name} twice for ${dealt}.`);
+      if (target.hp <= 0) {
+        killUnit(G, target, random);
+      } else if (!resolveSkillCounter(G, unit, target, random)) {
+        return;
+      }
+      break;
+    }
+
+    case 'guard-break': {
+      if (!target || !skillTargets(G, unit).some((candidate) => candidate.id === target.id)) return INVALID_MOVE;
+      const dmg = Math.max(1, effectiveStats(unit).atk - effectiveStats(target).def);
+      target.hp = Math.max(0, target.hp - dmg);
+      pushLog(G, `${unit.name} breaks ${target.name}'s guard for ${dmg}.`);
+      if (target.hp <= 0) {
+        killUnit(G, target, random);
+      } else if (!resolveSkillCounter(G, unit, target, random)) {
+        return;
+      }
+      break;
+    }
+
+    case 'snipe': {
+      if (!target || !skillTargets(G, unit).some((candidate) => candidate.id === target.id)) return INVALID_MOVE;
+      const dmg = computeDamage(G, unit, target) + SNIPE_BONUS;
+      target.hp = Math.max(0, target.hp - dmg);
+      pushLog(G, `${unit.name} snipes ${target.name} for ${dmg}. No counter possible.`);
+      if (target.hp <= 0) killUnit(G, target, random);
+      break;
+    }
+
+    case 'nova': {
+      const targets = skillAoeTargets(G, unit);
+      if (targets.length === 0) return INVALID_MOVE;
+      let totalDealt = 0;
+      for (const aoeTarget of targets) {
+        const dmg = Math.max(1, Math.round(computeDamage(G, unit, aoeTarget) * NOVA_DAMAGE_MULTIPLIER));
+        aoeTarget.hp = Math.max(0, aoeTarget.hp - dmg);
+        totalDealt += dmg;
+        if (aoeTarget.hp <= 0) killUnit(G, aoeTarget, random);
+      }
+      pushLog(G, `${unit.name} casts Nova, hitting ${targets.length} enemies for ${totalDealt} total.`);
+      break;
+    }
+
+    case 'rampage': {
+      if (!target || !skillTargets(G, unit).some((candidate) => candidate.id === target.id)) return INVALID_MOVE;
+      const dmg = computeDamage(G, unit, target);
+      target.hp = Math.max(0, target.hp - dmg);
+      pushLog(G, `${unit.name} rampages into ${target.name} for ${dmg}.`);
+      if (target.hp <= 0) {
+        killUnit(G, target, random);
+        unit.skillCooldown = skill.cooldown;
+        grantExp(G, unit);
+        // Deliberately leaves hasMoved/hasActed false — a kill refunds the turn.
+        return;
+      }
+      if (!resolveSkillCounter(G, unit, target, random)) return;
+      break;
+    }
+
+    default:
+      return INVALID_MOVE;
+  }
+
+  unit.skillCooldown = skill.cooldown;
+  grantExp(G, unit);
   unit.hasMoved = true;
   unit.hasActed = true;
 };
@@ -215,6 +355,7 @@ const moves: MoveMap<GameState> = {
   moveUnit,
   attackUnit,
   waitUnit,
+  useSkill,
   chooseBlessing,
   equipItem,
   unequipItem,
@@ -241,6 +382,7 @@ export const WinterEmblem: Game<GameState> = {
       for (const unit of unitsOf(G, team)) {
         unit.hasMoved = false;
         unit.hasActed = false;
+        if (unit.skillCooldown > 0) unit.skillCooldown -= 1;
       }
       pushLog(G, team === 'player' ? '— Player phase —' : '— Enemy phase —');
     },

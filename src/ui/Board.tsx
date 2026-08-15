@@ -20,6 +20,7 @@ import { decideEnemyAction } from '../game/ai';
 import { BLESSINGS } from '../game/blessings';
 import { EXP_TO_LEVEL } from '../game/classes';
 import { effectiveStats, ITEMS } from '../game/equipment';
+import { SKILLS, canUseSkill, describeSkillEffect, skillAoeTargets, skillTargets, type SkillDef } from '../game/skills';
 import type { ItemSlot } from '../game/types';
 import type { GameOver } from '../game/game';
 import pkg from '../../package.json';
@@ -51,7 +52,7 @@ const TERRAIN_SPRITE_INDEX: Record<TerrainType, number> = {
  * either commit to a target or back all the way out via undo. 'animating'
  * plays out a confirmed player attack before the real move is dispatched.
  */
-type Mode = 'move' | 'menu' | 'targeting' | 'confirm' | 'animating';
+type Mode = 'move' | 'menu' | 'targeting' | 'confirm' | 'animating' | 'skill-targeting' | 'skill-confirm';
 
 /**
  * Client-side-only playback state for a confirmed attack. The real
@@ -130,6 +131,25 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     [attackTargets],
   );
 
+  const skillDef = selected ? SKILLS[selected.className] : null;
+  const skillIsAoe = skillDef?.targetType === 'enemy-aoe';
+
+  // Single-select skill targets (empty for Nova, the only AoE skill — see
+  // skillAoeList below instead).
+  const skillTargetList = useMemo(
+    () => (selected && isPlayerPhase && !skillIsAoe ? skillTargets(G, selected) : []),
+    [G, selected, isPlayerPhase, skillIsAoe],
+  );
+  const skillTargetIds = useMemo(
+    () => new Set(skillTargetList.map((unit) => unit.id)),
+    [skillTargetList],
+  );
+  const skillAoeList = useMemo(
+    () => (selected && isPlayerPhase && skillIsAoe ? skillAoeTargets(G, selected) : []),
+    [G, selected, isPlayerPhase, skillIsAoe],
+  );
+  const canSkill = selected && isPlayerPhase ? canUseSkill(G, selected) : false;
+
   const threatTiles = useMemo(() => {
     if (!showThreat) return new Set<string>();
     const tiles = new Set<string>();
@@ -196,11 +216,25 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
       return;
     }
 
-    // 'menu' and 'confirm' modes are driven entirely by the floating panel.
+    if (mode === 'skill-targeting') {
+      if (clicked && skillTargetIds.has(clicked.id)) {
+        setPendingTargetId(clicked.id);
+        setMode('skill-confirm');
+      }
+      return;
+    }
+
+    // 'menu', 'confirm', and 'skill-confirm' modes are driven entirely by the floating panel.
   }
 
   function handleAttackPressed() {
     setMode('targeting');
+  }
+
+  function handleSkillPressed() {
+    // Nova has nothing to pick — it always hits every enemy in range, so
+    // skip straight to confirming rather than a targeting step with no target.
+    setMode(skillIsAoe ? 'skill-confirm' : 'skill-targeting');
   }
 
   function handleWaitPressed() {
@@ -221,6 +255,24 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   function handleCancelConfirm() {
     setPendingTargetId(null);
     setMode('targeting');
+  }
+
+  function handleCancelSkillConfirm() {
+    setPendingTargetId(null);
+    setMode(skillIsAoe ? 'menu' : 'skill-targeting');
+  }
+
+  /**
+   * Skills resolve instantly rather than playing out in animated beats the
+   * way a confirmed attack does — there's no single shared shape across
+   * heal/refresh/double-strike/AoE to animate uniformly, and the HP bars
+   * still transition smoothly on their own via CSS.
+   */
+  function handleConfirmSkill() {
+    if (!selected) return;
+    if (!skillIsAoe && !pendingTargetId) return;
+    moves.useSkill(selected.id, skillIsAoe ? null : pendingTargetId);
+    clearSelection();
   }
 
   /**
@@ -366,6 +418,15 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
         </div>
       )}
 
+      {mode === 'skill-targeting' && skillDef && (
+        <div className="we-targeting-hint">
+          <span>Choose a target for {skillDef.name}</span>
+          <button type="button" className="we-iconbutton" onClick={() => setMode('menu')}>
+            Cancel
+          </button>
+        </div>
+      )}
+
       <div className="we-layout">
         <div className="we-board-wrap">
           <div
@@ -386,6 +447,9 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 if (reachable.has(key) && !occupant) classes.push('we-tile--move');
                 if (mode === 'targeting' && occupant && attackTargetIds.has(occupant.id)) {
                   classes.push('we-tile--attack');
+                }
+                if (mode === 'skill-targeting' && occupant && skillTargetIds.has(occupant.id)) {
+                  classes.push(skillDef?.targetType === 'ally' ? 'we-tile--support' : 'we-tile--attack');
                 }
                 if (selected && selected.x === x && selected.y === y) {
                   classes.push('we-tile--selected');
@@ -447,7 +511,9 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 unit={selected}
                 boardWidth={G.width}
                 canAttack={attackTargets.length > 0}
+                skillLabel={canSkill && skillDef ? skillDef.name : null}
                 onAttack={handleAttackPressed}
+                onSkill={handleSkillPressed}
                 onWait={handleWaitPressed}
                 onBack={handleBackPressed}
               />
@@ -460,6 +526,18 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 forecast={forecast}
                 onConfirm={handleConfirmAttack}
                 onCancel={handleCancelConfirm}
+              />
+            )}
+
+            {mode === 'skill-confirm' && selected && skillDef && (
+              <SkillConfirmCard
+                G={G}
+                unit={selected}
+                skill={skillDef}
+                target={skillIsAoe ? null : pendingTargetId ? G.units[pendingTargetId] : undefined}
+                aoeTargets={skillAoeList}
+                onConfirm={handleConfirmSkill}
+                onCancel={handleCancelSkillConfirm}
               />
             )}
           </div>
@@ -533,14 +611,19 @@ function ActionPanel({
   unit,
   boardWidth,
   canAttack,
+  skillLabel,
   onAttack,
+  onSkill,
   onWait,
   onBack,
 }: {
   unit: Unit;
   boardWidth: number;
   canAttack: boolean;
+  /** The skill's own name (e.g. "Heal"), or null when it's not usable right now. */
+  skillLabel: string | null;
   onAttack: () => void;
+  onSkill: () => void;
   onWait: () => void;
   onBack: () => void;
 }) {
@@ -557,6 +640,11 @@ function ActionPanel({
         {canAttack && (
           <button type="button" className="we-menu__item" onClick={onAttack}>
             Attack
+          </button>
+        )}
+        {skillLabel && (
+          <button type="button" className="we-menu__item" onClick={onSkill}>
+            {skillLabel}
           </button>
         )}
         <button type="button" className="we-menu__item" onClick={onWait}>
@@ -795,6 +883,46 @@ function ForecastSide({
   );
 }
 
+/**
+ * Skills resolve instantly (no animated beats — see handleConfirmSkill), so
+ * this card's only job is a plain-text preview of what confirming will do,
+ * computed by the same formulas the real move applies.
+ */
+function SkillConfirmCard({
+  G,
+  unit,
+  skill,
+  target,
+  aoeTargets,
+  onConfirm,
+  onCancel,
+}: {
+  G: GameState;
+  unit: Unit;
+  skill: SkillDef;
+  target: Unit | null | undefined;
+  aoeTargets: Unit[];
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const preview = describeSkillEffect(G, unit, target ?? null, aoeTargets);
+
+  return (
+    <div className="we-forecast-card we-skill-card">
+      <div className="we-skill-card__title">
+        {unit.name}'s {skill.name}
+      </div>
+      <div className="we-skill-card__preview">{preview}</div>
+      <button type="button" className="we-menu__item we-menu__item--confirm" onClick={onConfirm}>
+        Confirm
+      </button>
+      <button type="button" className="we-menu__item we-menu__item--back" onClick={onCancel}>
+        Cancel
+      </button>
+    </div>
+  );
+}
+
 function UnitToken({
   unit,
   hpOverride,
@@ -945,6 +1073,14 @@ function SidePanel({
           </dd>
         </div>
       </dl>
+      <div className="we-panel__skill">
+        <strong>{SKILLS[inspected.className].name}</strong>
+        <span>
+          {inspected.skillCooldown > 0
+            ? `Ready in ${inspected.skillCooldown} turn${inspected.skillCooldown === 1 ? '' : 's'}`
+            : 'Ready'}
+        </span>
+      </div>
       <div className="we-panel__terrain">On {cover.name.toLowerCase()}</div>
 
       {forecast && selected && hovered && (
