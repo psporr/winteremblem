@@ -110,7 +110,18 @@ export function buildGameState(chapter: ChapterDef, random: ShuffleAPI): GameSta
     tiles,
     units,
     log: [`${chapter.name} — ${chapter.objective}`],
+    wave: 1,
+    awaitingBlessing: false,
   };
+}
+
+/** Where each player unit starts — waves reset the squad here between fights. */
+export function playerStartPositions(chapter: ChapterDef): Record<string, { x: number; y: number }> {
+  const positions: Record<string, { x: number; y: number }> = {};
+  for (const spec of chapter.units) {
+    if (spec.team === 'player') positions[spec.id] = { x: spec.x, y: spec.y };
+  }
+  return positions;
 }
 
 /**
@@ -120,7 +131,7 @@ export function buildGameState(chapter: ChapterDef, random: ShuffleAPI): GameSta
  */
 export const CHAPTER_1: ChapterDef = {
   name: 'Chapter 1: The Frozen Pass',
-  objective: 'Defeat all enemies',
+  objective: 'Survive as many waves as you can',
   rows: [
     '..##..',
     '......',

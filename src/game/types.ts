@@ -57,6 +57,10 @@ export interface GameState {
   units: Record<string, Unit>;
   /** Newest-first battle log, capped in length. */
   log: string[];
+  /** 1-indexed; increments each time a wave of enemies is fully cleared. */
+  wave: number;
+  /** True between clearing a wave and the player picking a blessing to continue. */
+  awaitingBlessing: boolean;
 }
 
 /** boardgame.io player IDs mapped onto the two sides of a battle. */

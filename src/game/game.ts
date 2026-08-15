@@ -3,11 +3,23 @@ import { INVALID_MOVE } from 'boardgame.io/core';
 
 import type { GameState, Team, Unit } from './types';
 import { PLAYER_ID, teamOf } from './types';
-import { buildGameState, CHAPTER_1 } from './maps';
+import { buildGameState, playerStartPositions, CHAPTER_1, type ShuffleAPI } from './maps';
 import { computeReachable, manhattan, tileKey, unitsOf } from './grid';
 import { forecastCombat } from './combat';
+import { BLESSINGS } from './blessings';
+import { spawnWave } from './waves';
+
+/**
+ * The slice of boardgame.io's EventsAPI we actually need. Defined locally,
+ * same reasoning as ShuffleAPI in maps.ts — not re-exported from the
+ * package's `types` entry.
+ */
+interface EndTurnAPI {
+  endTurn?: () => void;
+}
 
 const MAX_LOG_ENTRIES = 40;
+const PLAYER_START = playerStartPositions(CHAPTER_1);
 
 function pushLog(G: GameState, message: string): void {
   G.log.unshift(message);
@@ -43,6 +55,14 @@ export const moveUnit = (
   unit.hasMoved = true;
 };
 
+/** Marks the wave cleared once every enemy is gone, pausing play for a blessing pick. */
+function checkWaveCleared(G: GameState): void {
+  if (unitsOf(G, 'enemy').length === 0) {
+    G.awaitingBlessing = true;
+    pushLog(G, 'All enemies defeated! Choose your blessing.');
+  }
+}
+
 export const attackUnit = (
   { G, ctx }: { G: GameState; ctx: Ctx },
   attackerId: string,
@@ -62,12 +82,14 @@ export const attackUnit = (
   if (result.willKill) {
     pushLog(G, `${target.name} has fallen!`);
     delete G.units[targetId];
+    checkWaveCleared(G);
   } else if (result.counterDamage !== null) {
     attacker.hp = result.attackerHpAfter;
     pushLog(G, `${target.name} counters for ${result.counterDamage}.`);
     if (result.attackerWillDie) {
       pushLog(G, `${attacker.name} has fallen!`);
       delete G.units[attackerId];
+      checkWaveCleared(G);
       return;
     }
   }
@@ -85,11 +107,46 @@ export const waitUnit = ({ G, ctx }: { G: GameState; ctx: Ctx }, unitId: string)
   unit.hasActed = true;
 };
 
-const moves: MoveMap<GameState> = { moveUnit, attackUnit, waitUnit };
+/**
+ * Applies the chosen blessing to every surviving player unit, resets the
+ * squad to their start tiles, and spawns the next wave. Only valid right
+ * after a wave is cleared.
+ *
+ * If the last enemy fell during the enemy's own turn (e.g. a counterattack),
+ * this also force-ends that turn so the fresh wave's enemies don't get
+ * immediately auto-played by the CPU before the player has a turn.
+ */
+export const chooseBlessing = (
+  { G, ctx, events, random }: { G: GameState; ctx: Ctx; events: EndTurnAPI; random: ShuffleAPI },
+  blessingId: string,
+) => {
+  if (!G.awaitingBlessing) return INVALID_MOVE;
 
-function livingTeams(G: GameState): Record<Team, Unit[]> {
-  return { player: unitsOf(G, 'player'), enemy: unitsOf(G, 'enemy') };
-}
+  const blessing = BLESSINGS.find((candidate) => candidate.id === blessingId);
+  if (!blessing) return INVALID_MOVE;
+
+  for (const unit of unitsOf(G, 'player')) {
+    blessing.apply(unit);
+    unit.hasMoved = false;
+    unit.hasActed = false;
+    const start = PLAYER_START[unit.id];
+    if (start) {
+      unit.x = start.x;
+      unit.y = start.y;
+    }
+  }
+
+  G.wave += 1;
+  spawnWave(G, G.wave, random);
+  G.awaitingBlessing = false;
+  pushLog(G, `— Wave ${G.wave} —`);
+
+  if (teamOf(ctx.currentPlayer) !== 'player') {
+    events.endTurn?.();
+  }
+};
+
+const moves: MoveMap<GameState> = { moveUnit, attackUnit, waitUnit, chooseBlessing };
 
 export interface GameOver {
   winner: Team;
@@ -123,11 +180,11 @@ export const WinterEmblem: Game<GameState> = {
     },
   },
 
+  // Clearing a wave no longer ends the match — it's handled by
+  // chooseBlessing spawning the next one. The only way this run ends is a
+  // full wipe of the player's squad.
   endIf: ({ G }): GameOver | undefined => {
-    const { player, enemy } = livingTeams(G);
-    if (enemy.length === 0) return { winner: 'player' };
-    if (player.length === 0) return { winner: 'enemy' };
-    return undefined;
+    return unitsOf(G, 'player').length === 0 ? { winner: 'enemy' } : undefined;
   },
 };
 

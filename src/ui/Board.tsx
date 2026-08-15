@@ -17,6 +17,7 @@ import {
 } from '../game/grid';
 import { forecastCombat, type CombatForecast } from '../game/combat';
 import { decideEnemyAction } from '../game/ai';
+import { BLESSINGS } from '../game/blessings';
 import type { GameOver } from '../game/game';
 import './board.css';
 
@@ -49,7 +50,8 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   const [hoveredTargetId, setHoveredTargetId] = useState<string | null>(null);
   const [showThreat, setShowThreat] = useState(false);
 
-  const isPlayerPhase = ctx.currentPlayer === PLAYER_ID.player && !ctx.gameover;
+  const isPlayerPhase =
+    ctx.currentPlayer === PLAYER_ID.player && !ctx.gameover && !G.awaitingBlessing;
   const selected = selectedId ? G.units[selectedId] : undefined;
 
   function clearSelection() {
@@ -67,7 +69,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
 
   // Drive the CPU one action at a time; each dispatch mutates G and re-runs this.
   useEffect(() => {
-    if (ctx.gameover || ctx.currentPlayer !== PLAYER_ID.enemy) return;
+    if (ctx.gameover || G.awaitingBlessing || ctx.currentPlayer !== PLAYER_ID.enemy) return;
 
     const timer = setTimeout(() => {
       const action = decideEnemyAction(G);
@@ -209,6 +211,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
           <p className="we-objective">{G.objective}</p>
         </div>
         <div className="we-header-actions">
+          <span className="we-wave-badge">Wave {G.wave}</span>
           <button
             type="button"
             className="we-iconbutton"
@@ -233,6 +236,15 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
           )}
         </div>
       </header>
+
+      {mode === 'targeting' && (
+        <div className="we-targeting-hint">
+          <span>Choose a target</span>
+          <button type="button" className="we-iconbutton" onClick={handleCancelTargeting}>
+            Cancel
+          </button>
+        </div>
+      )}
 
       <div className="we-layout">
         <div className="we-board-wrap">
@@ -292,7 +304,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
               ))}
             </div>
 
-            {selected && mode !== 'move' && (
+            {selected && (mode === 'menu' || mode === 'confirm') && (
               <ActionPanel
                 unit={selected}
                 boardWidth={G.width}
@@ -303,7 +315,6 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 onAttack={handleAttackPressed}
                 onWait={handleWaitPressed}
                 onBack={handleBackPressed}
-                onCancelTargeting={handleCancelTargeting}
                 onCancelConfirm={handleCancelConfirm}
                 onConfirmAttack={handleConfirmAttack}
               />
@@ -322,15 +333,33 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
         </aside>
       </div>
 
+      {G.awaitingBlessing && !gameover && (
+        <div className="we-overlay">
+          <div className="we-overlay__card we-overlay__card--blessing">
+            <h2>Wave {G.wave} cleared!</h2>
+            <p>Choose a blessing before Wave {G.wave + 1} begins.</p>
+            <div className="we-blessing-list">
+              {BLESSINGS.map((blessing) => (
+                <button
+                  key={blessing.id}
+                  type="button"
+                  className="we-blessing"
+                  onClick={() => moves.chooseBlessing(blessing.id)}
+                >
+                  <strong>{blessing.name}</strong>
+                  <span>{blessing.description}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {gameover && (
         <div className="we-overlay">
           <div className="we-overlay__card">
-            <h2>{gameover.winner === 'player' ? 'Victory' : 'Defeat'}</h2>
-            <p>
-              {gameover.winner === 'player'
-                ? 'The pass is clear. Your company holds the line.'
-                : 'Your company has been wiped out.'}
-            </p>
+            <h2>Defeat</h2>
+            <p>Your company has been wiped out, having survived {G.wave} wave{G.wave === 1 ? '' : 's'}.</p>
             <button type="button" className="we-button" onClick={() => window.location.reload()}>
               Play again
             </button>
@@ -356,20 +385,18 @@ function ActionPanel({
   onAttack,
   onWait,
   onBack,
-  onCancelTargeting,
   onCancelConfirm,
   onConfirmAttack,
 }: {
   unit: Unit;
   boardWidth: number;
-  mode: Mode;
+  mode: 'menu' | 'confirm';
   canAttack: boolean;
   forecast: CombatForecast | null;
   target: Unit | undefined;
   onAttack: () => void;
   onWait: () => void;
   onBack: () => void;
-  onCancelTargeting: () => void;
   onCancelConfirm: () => void;
   onConfirmAttack: () => void;
 }) {
@@ -394,15 +421,6 @@ function ActionPanel({
           </button>
           <button type="button" className="we-menu__item we-menu__item--back" onClick={onBack}>
             Back
-          </button>
-        </div>
-      )}
-
-      {mode === 'targeting' && (
-        <div className="we-menu">
-          <p className="we-menu__hint">Choose a target</p>
-          <button type="button" className="we-menu__item we-menu__item--back" onClick={onCancelTargeting}>
-            Cancel
           </button>
         </div>
       )}

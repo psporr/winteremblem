@@ -2,9 +2,10 @@
 
 A turn-based tactics RPG in the Fire Emblem mould, built for the browser.
 
-**Current milestone: v1 — single-player campaign vs CPU.** Multiplayer co-op is
-the next milestone; the rules layer is already structured to make that a
-transport swap rather than a rewrite.
+**Current milestone: v1 — single-player wave-survival vs CPU.** Clear a wave of
+enemies, pick a blessing, and face a tougher wave — repeat until your squad
+falls. Multiplayer co-op is the next milestone; the rules layer is already
+structured to make that a transport swap rather than a rewrite.
 
 ## Running it
 
@@ -22,8 +23,9 @@ Other scripts:
 | `npm run sim`     | Play a whole battle headlessly with AI on both sides       |
 | `npm run bundle`  | After a build, inline it into one shareable `dist/winter-emblem.html` |
 
-`npm run sim` is the quickest regression check: it drives a full battle to a
-win condition and fails loudly on a stalemate.
+`npm run sim` is the quickest regression check: it drives waves with AI on
+both sides, picking a blessing after each clear, until the squad wipes or 6
+waves pass cleanly — failing loudly if neither happens.
 
 ## How to play
 
@@ -48,15 +50,24 @@ Command flow follows classic Fire Emblem, tuned for touch:
 Combat is deterministic in v1: damage is `Atk − (Def + terrain bonus)`, minimum 1.
 A defender counterattacks if it survives and the attacker is within its own reach.
 
+**Waves.** Clearing every enemy doesn't end the run — it pauses for a blessing
+pick (a squad-wide +Atk, +Def, or full heal), then a new, tougher wave spawns
+and the squad resets to their start tiles. Fallen units stay fallen for the
+rest of the run; there's no separate permadeath toggle because a run only ever
+has one life. The run ends when the whole squad is wiped.
+
 ## Project layout
 
 ```
 src/game/     rules layer — no React, no rendering
   types.ts       state model and terrain table
+  classes.ts     per-class base stats, shared by fixed and randomly-cast units
   maps.ts        ASCII chapter definitions -> initial state
   grid.ts        Dijkstra movement range, attack/threat range
   combat.ts      damage and counterattack forecasting
   ai.ts          CPU decision-making (one action at a time, stateless)
+  waves.ts       procedural enemy composition + difficulty scaling per wave
+  blessings.ts   squad-wide buffs offered after a wave clears
   game.ts        boardgame.io game definition: moves, phases, win conditions
 src/ui/       React board, panels, styling
 scripts/      headless battle simulator
@@ -95,11 +106,11 @@ artwork drawn for this project. See [CREDITS.md](CREDITS.md).
 
 ## Roadmap
 
-- v1 (current): one chapter, 4 player units (Lyn/Byleth/Corrin/Selva, one of
-  each class) vs 4 randomly-classed Bandits, local play. Maps are 6x8
-  (portrait), matching Fire Emblem Heroes' grid size so the board fits a
-  mobile viewport without horizontal scrolling
-- Next: Lancer and Mage sprites, Firebase Auth + Firestore save/resume, more
-  chapters
-- Later: weapon triangle, growth/leveling, inventory, permadeath toggle
+- v1 (current): wave-survival on one 6x8 map (portrait, matching Fire Emblem
+  Heroes' grid size so the board fits a mobile viewport without horizontal
+  scrolling). Squad is Lyn/Byleth/Corrin/Selva (one of each class) vs waves of
+  randomly-classed, difficulty-scaled Bandits, local play
+- Next: shop + equipment system (replacing/extending the simple blessing
+  picks), Lancer and Mage sprites, Firebase Auth + Firestore save/resume
+- Later: weapon triangle, growth/leveling, more maps
 - Later: online co-op for 5 players

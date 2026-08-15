@@ -51,7 +51,19 @@ body {
 
 .we-header-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+.we-wave-badge {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-edge);
+  background: var(--panel);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .we-iconbutton {
@@ -436,11 +448,20 @@ body {
   background: #4ad991;
 }
 
-.we-menu__hint {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: var(--ink-dim);
-  text-align: center;
+.we-targeting-hint {
+  max-width: 1180px;
+  margin: 0 auto 12px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--panel);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .we-menu--confirm {
@@ -512,4 +533,41 @@ body {
 .we-overlay__card p {
   margin: 0 0 18px;
   color: var(--ink-dim);
+}
+
+.we-overlay__card--blessing {
+  max-width: 420px;
+}
+
+.we-blessing-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.we-blessing {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-edge);
+  background: var(--bg);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.we-blessing:hover {
+  border-color: var(--accent);
+}
+
+.we-blessing strong {
+  color: var(--accent);
+  font-size: 15px;
+}
+
+.we-blessing span {
+  color: var(--ink-dim);
+  font-size: 13px;
 }
