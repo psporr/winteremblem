@@ -20,7 +20,10 @@ import { decideEnemyAction } from '../game/ai';
 import { BLESSINGS } from '../game/blessings';
 import { EXP_TO_LEVEL } from '../game/classes';
 import type { GameOver } from '../game/game';
+import pkg from '../../package.json';
 import './board.css';
+
+const GAME_VERSION = pkg.version;
 
 /** Pause between CPU actions so the player can follow what happened. */
 const ENEMY_ACTION_DELAY = 550;
@@ -208,7 +211,9 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     <div className="we-app">
       <header className="we-header">
         <div>
-          <h1>{G.chapterName}</h1>
+          <h1>
+            Winter Emblem <span className="we-version">v{GAME_VERSION}</span>
+          </h1>
           <p className="we-objective">{G.objective}</p>
         </div>
         <div className="we-header-actions">

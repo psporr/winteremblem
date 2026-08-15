@@ -43,6 +43,12 @@ body {
   letter-spacing: 0.3px;
 }
 
+.we-version {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink-dim);
+}
+
 .we-objective {
   margin: 4px 0 0;
   color: var(--ink-dim);
