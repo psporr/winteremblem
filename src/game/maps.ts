@@ -129,22 +129,23 @@ export function playerStartPositions(chapter: ChapterDef): Record<string, { x: n
 }
 
 /**
- * 6x8 portrait grid, matching Fire Emblem Heroes' standard map size — small
- * enough to fit a mobile viewport without horizontal scrolling at our
- * existing 54px tile size (6 tiles + gaps + padding ~= 350px wide).
+ * 7x8 portrait grid — one column wider than Fire Emblem Heroes' standard 6x8,
+ * added as an open flanking lane on the right. Tile size is responsive (see
+ * board.css's --tile), so this still fits a mobile viewport without
+ * horizontal scrolling.
  */
 export const CHAPTER_1: ChapterDef = {
   name: 'Chapter 1: The Frozen Pass',
   objective: 'Survive as many waves as you can',
   rows: [
-    '..##..',
-    '......',
-    '.ff...',
-    '...ff.',
-    '.ff...',
-    '...ff.',
-    '......',
-    '..##..',
+    '..##...',
+    '.......',
+    '.ff....',
+    '...ff..',
+    '.ff....',
+    '...ff..',
+    '.......',
+    '..##...',
   ],
   units: [
     { id: 'lyn', name: 'Lyn', team: 'player', className: 'Swordsman', x: 1, y: 6 },

@@ -117,12 +117,13 @@ artwork drawn for this project. See [CREDITS.md](CREDITS.md).
 
 ## Roadmap
 
-- v1 (current): wave-survival on one 6x8 map (portrait, matching Fire Emblem
-  Heroes' grid size so the board fits a mobile viewport without horizontal
-  scrolling). Squad is Lyn (Swordsman), Byleth (Archer), Corrin (Lancer),
-  Selva (Mage), Ake (Barbarian), Lissa (Cleric), Olivia (Dancer) vs waves of
-  randomly-classed, difficulty-scaled Bandits drawing from the same 7-class
-  pool, local play. Every class has real sprite art
+- v1 (current): wave-survival on one 7x8 map (portrait, one column wider than
+  Fire Emblem Heroes' standard grid; tile size is responsive so the board
+  fills the viewport without horizontal scrolling). Squad is Lyn (Swordsman),
+  Byleth (Archer), Corrin (Lancer), Selva (Mage), Ake (Barbarian), Lissa
+  (Cleric), Olivia (Dancer) vs waves of randomly-classed, difficulty-scaled
+  Bandits drawing from the same 7-class pool, local play. Every class has
+  real sprite art
 - Next: shop + equipment system (replacing/extending the simple blessing
   picks), Firebase Auth + Firestore save/resume, real Cleric (healing) and
   Dancer (refresh an ally) abilities — both currently fight as ordinary

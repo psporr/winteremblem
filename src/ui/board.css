@@ -1,5 +1,10 @@
 :root {
-  --tile: 54px;
+  /* Fills the viewport width on mobile rather than sitting at a fixed size:
+     100vw minus .we-app's horizontal padding (40px), .we-board's own padding
+     (16px), and the 6 inter-tile gaps on our 7-column map (12px), divided
+     across those 7 columns. Clamped so it doesn't shrink below legible or
+     grow past a comfortable size on wider screens. */
+  --tile: clamp(40px, calc((100vw - 68px) / 7), 64px);
   --tile-gap: 2px;
   --board-pad: 8px;
   --ink: #e8eef6;
