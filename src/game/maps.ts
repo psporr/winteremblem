@@ -63,18 +63,23 @@ export function buildGameState(chapter: ChapterDef): GameState {
   };
 }
 
+/**
+ * 6x8 portrait grid, matching Fire Emblem Heroes' standard map size — small
+ * enough to fit a mobile viewport without horizontal scrolling at our
+ * existing 54px tile size (6 tiles + gaps + padding ~= 350px wide).
+ */
 export const CHAPTER_1: ChapterDef = {
   name: 'Chapter 1: The Frozen Pass',
   objective: 'Defeat all enemies',
   rows: [
-    '..ff....##....',
-    '..ff.....#....',
-    '.....ff.......',
-    '##.....ff.....',
-    '##......f.....',
-    '.....ff.......',
-    '..ff.....#....',
-    '..ff....##....',
+    '..##..',
+    '......',
+    '.ff...',
+    '...ff.',
+    '.ff...',
+    '...ff.',
+    '......',
+    '..##..',
   ],
   units: [
     {
@@ -82,12 +87,12 @@ export const CHAPTER_1: ChapterDef = {
       name: 'Roland',
       team: 'player',
       className: 'Swordsman',
-      x: 2,
-      y: 3,
+      x: 1,
+      y: 6,
       maxHp: 24,
       atk: 9,
       def: 5,
-      move: 5,
+      move: 3,
       range: 1,
     },
     {
@@ -95,12 +100,12 @@ export const CHAPTER_1: ChapterDef = {
       name: 'Iris',
       team: 'player',
       className: 'Archer',
-      x: 1,
-      y: 4,
+      x: 4,
+      y: 7,
       maxHp: 18,
       atk: 8,
       def: 3,
-      move: 5,
+      move: 3,
       range: 2,
     },
     {
@@ -108,12 +113,12 @@ export const CHAPTER_1: ChapterDef = {
       name: 'Marauder',
       team: 'enemy',
       className: 'Swordsman',
-      x: 11,
-      y: 3,
+      x: 4,
+      y: 1,
       maxHp: 22,
       atk: 8,
       def: 4,
-      move: 5,
+      move: 3,
       range: 1,
     },
     {
@@ -121,12 +126,12 @@ export const CHAPTER_1: ChapterDef = {
       name: 'Bandit Archer',
       team: 'enemy',
       className: 'Archer',
-      x: 12,
-      y: 4,
+      x: 1,
+      y: 0,
       maxHp: 16,
       atk: 8,
       def: 2,
-      move: 4,
+      move: 3,
       range: 2,
     },
   ],

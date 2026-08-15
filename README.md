@@ -87,7 +87,9 @@ artwork drawn for this project. See [CREDITS.md](CREDITS.md).
 
 ## Roadmap
 
-- v1 (current): one chapter, 2 player units vs 2 CPU units, local play
+- v1 (current): one chapter, 2 player units vs 2 CPU units, local play. Maps
+  are 6x8 (portrait), matching Fire Emblem Heroes' grid size so the board fits
+  a mobile viewport without horizontal scrolling
 - Next: Firebase Auth + Firestore save/resume, more chapters, more classes
 - Later: weapon triangle, classes and growth, inventory, permadeath toggle
 - Later: online co-op for 5 players
