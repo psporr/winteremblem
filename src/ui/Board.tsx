@@ -28,6 +28,9 @@ const GAME_VERSION = pkg.version;
 /** Pause between CPU actions so the player can follow what happened. */
 const ENEMY_ACTION_DELAY = 550;
 
+/** How long each beat of a player attack's animation holds before the next. */
+const COMBAT_BEAT_MS = 500;
+
 const EMPTY_REACHABLE = new Map<string, ReachableTile>();
 
 /**
@@ -43,9 +46,24 @@ const TERRAIN_SPRITE_INDEX: Record<TerrainType, number> = {
 /**
  * The command flow for a selected unit, mirroring classic Fire Emblem:
  * pick a destination -> a menu of what's possible from there appears ->
- * either commit to a target or back all the way out via undo.
+ * either commit to a target or back all the way out via undo. 'animating'
+ * plays out a confirmed player attack before the real move is dispatched.
  */
-type Mode = 'move' | 'menu' | 'targeting' | 'confirm';
+type Mode = 'move' | 'menu' | 'targeting' | 'confirm' | 'animating';
+
+/**
+ * Client-side-only playback state for a confirmed attack. The real
+ * attackUnit move doesn't fire until this finishes, so hpOverride is how the
+ * board shows HP draining before G actually changes.
+ */
+interface CombatAnim {
+  attackerId: string;
+  targetId: string;
+  attackerHp: number;
+  targetHp: number;
+  shakingId: string | null;
+  floatingDamage: { unitId: string; value: number } | null;
+}
 
 export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -53,6 +71,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   const [pendingTargetId, setPendingTargetId] = useState<string | null>(null);
   const [hoveredTargetId, setHoveredTargetId] = useState<string | null>(null);
   const [showThreat, setShowThreat] = useState(false);
+  const [combatAnim, setCombatAnim] = useState<CombatAnim | null>(null);
 
   const isPlayerPhase =
     ctx.currentPlayer === PLAYER_ID.player && !ctx.gameover && !G.awaitingBlessing;
@@ -199,10 +218,69 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     setMode('targeting');
   }
 
+  /**
+   * Plays the confirmed exchange out beat by beat using the forecast we
+   * already computed, then dispatches the real attackUnit move once the
+   * animation finishes. The move is the only thing that actually changes G;
+   * everything visible during playback is local state that happens to match
+   * where the move is about to land.
+   */
   function handleConfirmAttack() {
-    if (!selected || !pendingTargetId) return;
-    moves.attackUnit(selected.id, pendingTargetId);
-    clearSelection();
+    if (!selected || !pendingTargetId || !forecast || !previewTarget) return;
+
+    const attackerId = selected.id;
+    const targetId = pendingTargetId;
+    const hasCounter = forecast.counterDamage !== null && !forecast.willKill;
+
+    setMode('animating');
+    setCombatAnim({
+      attackerId,
+      targetId,
+      attackerHp: selected.hp,
+      targetHp: previewTarget.hp,
+      shakingId: null,
+      floatingDamage: null,
+    });
+
+    // Beat 1, next tick so the pre-hit frame actually paints first: the hit lands.
+    window.setTimeout(() => {
+      setCombatAnim((prev) =>
+        prev
+          ? {
+              ...prev,
+              targetHp: forecast.defenderHpAfter,
+              shakingId: targetId,
+              floatingDamage: { unitId: targetId, value: forecast.damageDealt },
+            }
+          : prev,
+      );
+    }, 20);
+
+    // Beat 2, only if the target survives and can strike back: the counter lands.
+    if (hasCounter) {
+      window.setTimeout(() => {
+        setCombatAnim((prev) =>
+          prev
+            ? {
+                ...prev,
+                attackerHp: forecast.attackerHpAfter,
+                shakingId: attackerId,
+                floatingDamage: { unitId: attackerId, value: forecast.counterDamage as number },
+              }
+            : prev,
+        );
+      }, COMBAT_BEAT_MS);
+    }
+
+    // Resolve: commit the real move, then hand control back.
+    window.setTimeout(
+      () => {
+        moves.attackUnit(attackerId, targetId);
+        setCombatAnim(null);
+        clearSelection();
+      },
+      hasCounter ? COMBAT_BEAT_MS * 2 : COMBAT_BEAT_MS,
+    );
   }
 
   const gameover = ctx.gameover as GameOver | undefined;
@@ -227,7 +305,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
           >
             {showThreat ? 'Hide range' : 'Enemy range'}
           </button>
-          {isPlayerPhase && (
+          {isPlayerPhase && mode !== 'animating' && (
             <button
               type="button"
               className="we-iconbutton"
@@ -297,17 +375,37 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 moving a unit slides its token to the new cell instead of the
                 tile-button remount that would otherwise cause an instant jump. */}
             <div className="we-unit-layer">
-              {Object.values(G.units).map((unit) => (
-                <div
-                  key={unit.id}
-                  className="we-unit-slot"
-                  style={{
-                    transform: `translate(calc((var(--tile) + var(--tile-gap)) * ${unit.x}), calc((var(--tile) + var(--tile-gap)) * ${unit.y}))`,
-                  }}
-                >
-                  <UnitToken unit={unit} />
-                </div>
-              ))}
+              {Object.values(G.units).map((unit) => {
+                const isAnimAttacker = combatAnim?.attackerId === unit.id;
+                const isAnimTarget = combatAnim?.targetId === unit.id;
+                const hpOverride = isAnimAttacker
+                  ? combatAnim.attackerHp
+                  : isAnimTarget
+                    ? combatAnim.targetHp
+                    : undefined;
+                const shaking = combatAnim?.shakingId === unit.id;
+                const floatingDamage =
+                  combatAnim?.floatingDamage?.unitId === unit.id
+                    ? combatAnim.floatingDamage.value
+                    : null;
+
+                return (
+                  <div
+                    key={unit.id}
+                    className="we-unit-slot"
+                    style={{
+                      transform: `translate(calc((var(--tile) + var(--tile-gap)) * ${unit.x}), calc((var(--tile) + var(--tile-gap)) * ${unit.y}))`,
+                    }}
+                  >
+                    <UnitToken
+                      unit={unit}
+                      hpOverride={hpOverride}
+                      shaking={shaking}
+                      floatingDamage={floatingDamage}
+                    />
+                  </div>
+                );
+              })}
             </div>
 
             {selected && (mode === 'menu' || mode === 'confirm') && (
@@ -520,8 +618,20 @@ function ForecastSide({
   );
 }
 
-function UnitToken({ unit }: { unit: Unit }) {
-  const hpRatio = unit.hp / unit.maxHp;
+function UnitToken({
+  unit,
+  hpOverride,
+  shaking,
+  floatingDamage,
+}: {
+  unit: Unit;
+  /** Shown instead of unit.hp while a confirmed attack is animating. */
+  hpOverride?: number;
+  shaking?: boolean;
+  floatingDamage?: number | null;
+}) {
+  const displayedHp = hpOverride ?? unit.hp;
+  const hpRatio = Math.max(0, displayedHp) / unit.maxHp;
   const sprite = UNIT_SPRITES[unit.className];
 
   const classes = [
@@ -529,6 +639,7 @@ function UnitToken({ unit }: { unit: Unit }) {
     `we-unit--${unit.team}`,
     unit.hasActed ? 'we-unit--spent' : '',
     sprite ? '' : 'we-unit--glyph',
+    shaking ? 'we-unit--shake' : '',
   ].filter(Boolean);
 
   return (
@@ -552,6 +663,11 @@ function UnitToken({ unit }: { unit: Unit }) {
       <span className="we-unit__hp">
         <span className="we-unit__hp-fill" style={{ width: `${hpRatio * 100}%` }} />
       </span>
+      {floatingDamage != null && (
+        <span key={floatingDamage} className="we-unit__float-dmg">
+          -{floatingDamage}
+        </span>
+      )}
     </div>
   );
 }

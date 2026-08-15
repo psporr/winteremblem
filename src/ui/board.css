@@ -265,6 +265,70 @@ body {
   display: block;
   height: 100%;
   background: #4ad991;
+  transition: width 400ms ease;
+}
+
+/* A brief impact shake — one pass, not looped, so the class can stay applied
+   for the rest of the beat without the sprite jittering the whole time. */
+.we-unit--shake {
+  animation: we-unit-shake 320ms ease;
+}
+
+@keyframes we-unit-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(3px);
+  }
+  60% {
+    transform: translateX(-2px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+}
+
+.we-unit__float-dmg {
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  color: var(--danger);
+  font-weight: 800;
+  font-size: 15px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  animation: we-float-dmg 700ms ease-out forwards;
+}
+
+@keyframes we-float-dmg {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -6px) scale(1.05);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -28px) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .we-unit--shake,
+  .we-unit__float-dmg {
+    animation: none;
+  }
+
+  .we-unit__hp-fill {
+    transition: none;
+  }
 }
 
 .we-sidebar {

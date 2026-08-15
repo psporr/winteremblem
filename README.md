@@ -41,6 +41,10 @@ Command flow follows classic Fire Emblem, tuned for touch:
   Fire Emblem-style forecast card — both units' portraits, HP counting down to
   their post-combat values, attack/counter damage — before **Confirm** commits
   it. **Cancel** backs out to target selection.
+- **Confirming a player attack plays it out in beats**, not instantly: the hit
+  lands (floating damage number, HP bar drains, a brief shake), then — if the
+  target survives and can strike back — the counter lands the same way, before
+  the result actually applies. Enemy attacks still resolve instantly for now.
 - **Tap Back** in the menu to undo the move entirely and reconsider — the unit
   returns to where it started, free to move again.
 - **Wait** ends a unit's turn where it stands. The phase ends automatically once
