@@ -98,7 +98,7 @@ export interface GameOver {
 export const WinterEmblem: Game<GameState> = {
   name: 'winter-emblem',
 
-  setup: () => buildGameState(CHAPTER_1),
+  setup: ({ random }) => buildGameState(CHAPTER_1, random),
 
   // Two sides: '0' is the player's army, '1' is the CPU army.
   minPlayers: 2,

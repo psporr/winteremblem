@@ -11,4 +11,6 @@ forest, and mountain/wall tiles were extracted from the original 7×52 sheet;
 no changes were made to the sprites themselves.
 
 **Unit sprites** (`src/assets/units/`) — original artwork drawn for this
-project by a friend of the developer. No external license applies.
+project by a friend of the developer. No external license applies. Currently
+covers the Swordsman and Archer classes; Lancer and Mage render as placeholder
+tokens until sprites exist for them.
