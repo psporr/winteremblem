@@ -49,32 +49,26 @@ body {
   font-size: 14px;
 }
 
-.we-phase {
-  text-align: right;
-  padding: 8px 16px;
+.we-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.we-iconbutton {
+  padding: 8px 12px;
   border-radius: 8px;
   border: 1px solid var(--panel-edge);
   background: var(--panel);
-}
-
-.we-phase--player .we-phase__label {
-  color: var(--accent);
-}
-
-.we-phase--enemy .we-phase__label {
-  color: var(--danger);
-}
-
-.we-phase__label {
-  display: block;
+  color: var(--ink);
   font-weight: 600;
-  font-size: 15px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-.we-phase__round {
-  display: block;
-  font-size: 12px;
-  color: var(--ink-dim);
+.we-iconbutton[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .we-layout {
@@ -356,12 +350,6 @@ body {
   font-weight: 600;
 }
 
-.we-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
 .we-button {
   flex: 1 1 auto;
   padding: 9px 14px;
@@ -374,10 +362,110 @@ body {
   cursor: pointer;
 }
 
-.we-button--ghost {
+/* Anchored to the selected unit's tile; the actual card offsets to whichever
+   side keeps it on the board, flipping near the edge. */
+.we-panel-anchor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--tile);
+  height: var(--tile);
+  z-index: 5;
+}
+
+.we-menu {
+  position: absolute;
+  top: 0;
+  width: 132px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: rgba(22, 32, 47, 0.88);
+  border: 1px solid var(--panel-edge);
+  backdrop-filter: blur(3px);
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  animation: we-menu-in 140ms ease;
+}
+
+@keyframes we-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .we-menu {
+    animation: none;
+  }
+}
+
+.we-panel-anchor--right .we-menu {
+  left: calc(var(--tile) + 8px);
+}
+
+.we-panel-anchor--left .we-menu {
+  left: calc(-132px - 8px);
+}
+
+.we-menu__item {
+  padding: 8px 10px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: #0d1420;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.we-menu__item--back {
   background: transparent;
   border-color: var(--panel-edge);
-  color: var(--ink);
+  color: var(--ink-dim);
+}
+
+.we-menu__item--confirm {
+  background: #4ad991;
+}
+
+.we-menu__hint {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--ink-dim);
+  text-align: center;
+}
+
+.we-menu--confirm {
+  width: 150px;
+  font-size: 12px;
+}
+
+.we-menu__forecast-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 1px 0;
+}
+
+.we-menu__kill {
+  color: #4ad991;
+  font-weight: 700;
+  text-align: center;
+  font-size: 12px;
+}
+
+.we-menu__danger {
+  color: var(--danger);
+  font-weight: 700;
+  text-align: center;
+  font-size: 12px;
 }
 
 .we-log {

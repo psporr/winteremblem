@@ -27,15 +27,23 @@ win condition and fails loudly on a stalemate.
 
 ## How to play
 
-- **Click one of your units** (blue) to select it. Reachable tiles light up blue;
+Command flow follows classic Fire Emblem, tuned for touch:
+
+- **Tap one of your units** (blue) to select it. Reachable tiles light up blue;
   forest costs 2 movement, walls are impassable, enemies block movement.
-- **Click a blue tile** to move there. A unit that has moved is committed — it
-  must then attack or wait.
-- **Click a red-outlined enemy** to attack it. Hover an enemy while a unit is
-  selected to see a damage forecast before committing.
+- **Tap a tile to move there** — including the unit's own tile, to act without
+  moving. A floating menu appears beside the unit showing only what's actually
+  possible from that position: **Attack** (only if an enemy is in range) and
+  **Wait**.
+- **Tap Attack** to highlight valid targets in red, then tap one to preview the
+  exchange — damage dealt, HP remaining, and counter damage — before **Confirm**
+  commits it. **Cancel** backs out to target selection.
+- **Tap Back** in the menu to undo the move entirely and reconsider — the unit
+  returns to where it started, free to move again.
 - **Wait** ends a unit's turn where it stands. The phase ends automatically once
-  every unit has acted, or you can **End turn** early.
-- **Show enemy range** paints every tile the CPU army can strike next phase.
+  every unit has acted, or **End turn** (top of the screen) ends it early.
+- **Enemy range** (top of the screen) paints every tile the CPU army can strike
+  next phase.
 
 Combat is deterministic in v1: damage is `Atk − (Def + terrain bonus)`, minimum 1.
 A defender counterattacks if it survives and the attacker is within its own reach.

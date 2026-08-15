@@ -15,7 +15,7 @@ import {
   unitsOf,
   type ReachableTile,
 } from '../game/grid';
-import { forecastCombat } from '../game/combat';
+import { forecastCombat, type CombatForecast } from '../game/combat';
 import { decideEnemyAction } from '../game/ai';
 import type { GameOver } from '../game/game';
 import './board.css';
@@ -35,18 +35,34 @@ const TERRAIN_SPRITE_INDEX: Record<TerrainType, number> = {
   wall: 2,
 };
 
-export function Board({ G, ctx, moves, events }: BoardProps<GameState>) {
+/**
+ * The command flow for a selected unit, mirroring classic Fire Emblem:
+ * pick a destination -> a menu of what's possible from there appears ->
+ * either commit to a target or back all the way out via undo.
+ */
+type Mode = 'move' | 'menu' | 'targeting' | 'confirm';
+
+export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [mode, setMode] = useState<Mode>('move');
+  const [pendingTargetId, setPendingTargetId] = useState<string | null>(null);
   const [hoveredTargetId, setHoveredTargetId] = useState<string | null>(null);
   const [showThreat, setShowThreat] = useState(false);
 
   const isPlayerPhase = ctx.currentPlayer === PLAYER_ID.player && !ctx.gameover;
   const selected = selectedId ? G.units[selectedId] : undefined;
 
+  function clearSelection() {
+    setSelectedId(null);
+    setMode('move');
+    setPendingTargetId(null);
+  }
+
   // Selection never survives a phase change.
   useEffect(() => {
-    setSelectedId(null);
+    clearSelection();
     setHoveredTargetId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx.currentPlayer]);
 
   // Drive the CPU one action at a time; each dispatch mutates G and re-runs this.
@@ -68,10 +84,13 @@ export function Board({ G, ctx, moves, events }: BoardProps<GameState>) {
   }, [G, ctx.currentPlayer, ctx.gameover, moves, events]);
 
   const reachable = useMemo(
-    () => (selected && isPlayerPhase ? computeReachable(G, selected) : EMPTY_REACHABLE),
-    [G, selected, isPlayerPhase],
+    () => (selected && isPlayerPhase && mode === 'move' ? computeReachable(G, selected) : EMPTY_REACHABLE),
+    [G, selected, isPlayerPhase, mode],
   );
 
+  // What the selected unit could hit *from its current tile* — used both to
+  // decide whether the menu offers Attack, and (once targeting) to light up
+  // valid targets on the board.
   const attackTargets = useMemo(
     () => (selected && isPlayerPhase ? targetsFrom(G, selected, selected.x, selected.y) : []),
     [G, selected, isPlayerPhase],
@@ -91,43 +110,96 @@ export function Board({ G, ctx, moves, events }: BoardProps<GameState>) {
     return tiles;
   }, [G, showThreat]);
 
-  const hoveredTarget = hoveredTargetId ? G.units[hoveredTargetId] : undefined;
+  // In confirm mode the pending target drives the preview; otherwise desktop
+  // hover does. Either way the bottom panel and the floating card agree.
+  const previewTargetId = mode === 'confirm' ? pendingTargetId : hoveredTargetId;
+  const previewTarget = previewTargetId ? G.units[previewTargetId] : undefined;
   const forecast =
-    selected && hoveredTarget && attackTargetIds.has(hoveredTarget.id)
-      ? forecastCombat(G, selected, hoveredTarget)
+    selected && previewTarget && attackTargetIds.has(previewTarget.id)
+      ? forecastCombat(G, selected, previewTarget)
       : null;
+
+  function selectUnit(unit: Unit) {
+    setSelectedId(unit.id);
+    setMode('move');
+    setPendingTargetId(null);
+  }
+
+  function confirmDestination(x: number, y: number) {
+    if (!selected) return;
+    if (!selected.hasMoved) moves.moveUnit(selected.id, x, y);
+    setMode('menu');
+  }
 
   function handleTileClick(x: number, y: number) {
     if (!isPlayerPhase) return;
     const clicked = unitAt(G, x, y);
 
-    if (selected) {
-      if (clicked && attackTargetIds.has(clicked.id)) {
-        moves.attackUnit(selected.id, clicked.id);
-        setSelectedId(null);
-        return;
-      }
-      if (!selected.hasMoved && !clicked && reachable.has(tileKey(x, y))) {
-        moves.moveUnit(selected.id, x, y);
-        return;
-      }
-      // A unit that has already moved is committed: it must attack or wait.
-      if (selected.hasMoved) return;
-      if (clicked && clicked.team === 'player' && !clicked.hasActed) {
-        setSelectedId(clicked.id);
-        return;
-      }
-      setSelectedId(null);
+    if (!selected) {
+      if (clicked && clicked.team === 'player' && !clicked.hasActed) selectUnit(clicked);
       return;
     }
 
-    if (clicked && clicked.team === 'player' && !clicked.hasActed) {
-      setSelectedId(clicked.id);
+    if (mode === 'move') {
+      if (clicked && clicked.id === selected.id) {
+        confirmDestination(selected.x, selected.y);
+        return;
+      }
+      if (!clicked && reachable.has(tileKey(x, y))) {
+        confirmDestination(x, y);
+        return;
+      }
+      if (clicked && clicked.team === 'player' && !clicked.hasActed) {
+        selectUnit(clicked);
+        return;
+      }
+      clearSelection();
+      return;
     }
+
+    if (mode === 'targeting') {
+      if (clicked && attackTargetIds.has(clicked.id)) {
+        setPendingTargetId(clicked.id);
+        setMode('confirm');
+      }
+      // Other taps are ignored here — Cancel in the floating panel backs out.
+      return;
+    }
+
+    // 'menu' and 'confirm' modes are driven entirely by the floating panel.
+  }
+
+  function handleAttackPressed() {
+    setMode('targeting');
+  }
+
+  function handleWaitPressed() {
+    if (!selected) return;
+    moves.waitUnit(selected.id);
+    clearSelection();
+  }
+
+  function handleBackPressed() {
+    undo();
+    clearSelection();
+  }
+
+  function handleCancelTargeting() {
+    setMode('menu');
+  }
+
+  function handleCancelConfirm() {
+    setPendingTargetId(null);
+    setMode('targeting');
+  }
+
+  function handleConfirmAttack() {
+    if (!selected || !pendingTargetId) return;
+    moves.attackUnit(selected.id, pendingTargetId);
+    clearSelection();
   }
 
   const gameover = ctx.gameover as GameOver | undefined;
-  const round = Math.ceil(ctx.turn / 2);
 
   return (
     <div className="we-app">
@@ -136,11 +208,29 @@ export function Board({ G, ctx, moves, events }: BoardProps<GameState>) {
           <h1>{G.chapterName}</h1>
           <p className="we-objective">{G.objective}</p>
         </div>
-        <div className={`we-phase we-phase--${isPlayerPhase ? 'player' : 'enemy'}`}>
-          <span className="we-phase__label">
-            {ctx.gameover ? 'Battle over' : isPlayerPhase ? 'Player phase' : 'Enemy phase'}
-          </span>
-          <span className="we-phase__round">Round {round}</span>
+        <div className="we-header-actions">
+          <button
+            type="button"
+            className="we-iconbutton"
+            aria-pressed={showThreat}
+            title={`${showThreat ? 'Hide' : 'Show'} enemy range`}
+            onClick={() => setShowThreat((value) => !value)}
+          >
+            {showThreat ? 'Hide range' : 'Enemy range'}
+          </button>
+          {isPlayerPhase && (
+            <button
+              type="button"
+              className="we-iconbutton"
+              title="End turn"
+              onClick={() => {
+                clearSelection();
+                events.endTurn?.();
+              }}
+            >
+              End turn
+            </button>
+          )}
         </div>
       </header>
 
@@ -162,7 +252,9 @@ export function Board({ G, ctx, moves, events }: BoardProps<GameState>) {
                 const classes = ['we-tile', `we-tile--${terrainType}`];
 
                 if (reachable.has(key) && !occupant) classes.push('we-tile--move');
-                if (occupant && attackTargetIds.has(occupant.id)) classes.push('we-tile--attack');
+                if (mode === 'targeting' && occupant && attackTargetIds.has(occupant.id)) {
+                  classes.push('we-tile--attack');
+                }
                 if (selected && selected.x === x && selected.y === y) {
                   classes.push('we-tile--selected');
                 }
@@ -199,50 +291,28 @@ export function Board({ G, ctx, moves, events }: BoardProps<GameState>) {
                 </div>
               ))}
             </div>
+
+            {selected && mode !== 'move' && (
+              <ActionPanel
+                unit={selected}
+                boardWidth={G.width}
+                mode={mode}
+                canAttack={attackTargets.length > 0}
+                forecast={forecast}
+                target={previewTarget}
+                onAttack={handleAttackPressed}
+                onWait={handleWaitPressed}
+                onBack={handleBackPressed}
+                onCancelTargeting={handleCancelTargeting}
+                onCancelConfirm={handleCancelConfirm}
+                onConfirmAttack={handleConfirmAttack}
+              />
+            )}
           </div>
         </div>
 
         <aside className="we-sidebar">
-          <SidePanel
-            selected={selected}
-            hovered={hoveredTarget}
-            forecast={forecast}
-            G={G}
-          />
-
-          <div className="we-actions">
-            {selected && isPlayerPhase && (
-              <button
-                type="button"
-                className="we-button"
-                onClick={() => {
-                  moves.waitUnit(selected.id);
-                  setSelectedId(null);
-                }}
-              >
-                Wait
-              </button>
-            )}
-            <button
-              type="button"
-              className="we-button we-button--ghost"
-              onClick={() => setShowThreat((value) => !value)}
-            >
-              {showThreat ? 'Hide' : 'Show'} enemy range
-            </button>
-            {isPlayerPhase && (
-              <button
-                type="button"
-                className="we-button we-button--ghost"
-                onClick={() => {
-                  setSelectedId(null);
-                  events.endTurn?.();
-                }}
-              >
-                End turn
-              </button>
-            )}
-          </div>
+          <SidePanel selected={selected} hovered={previewTarget} forecast={forecast} G={G} />
 
           <ol className="we-log">
             {G.log.map((entry, index) => (
@@ -265,6 +335,100 @@ export function Board({ G, ctx, moves, events }: BoardProps<GameState>) {
               Play again
             </button>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Floating, Fire-Emblem-style context menu anchored beside the selected
+ * unit's tile. Flips to the opposite side near the board edge so it never
+ * renders off the board.
+ */
+function ActionPanel({
+  unit,
+  boardWidth,
+  mode,
+  canAttack,
+  forecast,
+  target,
+  onAttack,
+  onWait,
+  onBack,
+  onCancelTargeting,
+  onCancelConfirm,
+  onConfirmAttack,
+}: {
+  unit: Unit;
+  boardWidth: number;
+  mode: Mode;
+  canAttack: boolean;
+  forecast: CombatForecast | null;
+  target: Unit | undefined;
+  onAttack: () => void;
+  onWait: () => void;
+  onBack: () => void;
+  onCancelTargeting: () => void;
+  onCancelConfirm: () => void;
+  onConfirmAttack: () => void;
+}) {
+  const side = unit.x < boardWidth / 2 ? 'right' : 'left';
+
+  return (
+    <div
+      className={`we-panel-anchor we-panel-anchor--${side}`}
+      style={{
+        transform: `translate(calc((var(--tile) + var(--tile-gap)) * ${unit.x}), calc((var(--tile) + var(--tile-gap)) * ${unit.y}))`,
+      }}
+    >
+      {mode === 'menu' && (
+        <div className="we-menu">
+          {canAttack && (
+            <button type="button" className="we-menu__item" onClick={onAttack}>
+              Attack
+            </button>
+          )}
+          <button type="button" className="we-menu__item" onClick={onWait}>
+            Wait
+          </button>
+          <button type="button" className="we-menu__item we-menu__item--back" onClick={onBack}>
+            Back
+          </button>
+        </div>
+      )}
+
+      {mode === 'targeting' && (
+        <div className="we-menu">
+          <p className="we-menu__hint">Choose a target</p>
+          <button type="button" className="we-menu__item we-menu__item--back" onClick={onCancelTargeting}>
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {mode === 'confirm' && forecast && target && (
+        <div className="we-menu we-menu--confirm">
+          <div className="we-menu__forecast-row">
+            <span>{unit.name} deals</span>
+            <strong>{forecast.damageDealt}</strong>
+          </div>
+          <div className="we-menu__forecast-row">
+            <span>{target.name} left</span>
+            <strong>{forecast.defenderHpAfter}</strong>
+          </div>
+          <div className="we-menu__forecast-row">
+            <span>Counter</span>
+            <strong>{forecast.counterDamage ?? '—'}</strong>
+          </div>
+          {forecast.willKill && <div className="we-menu__kill">Lethal</div>}
+          {forecast.attackerWillDie && <div className="we-menu__danger">You would die</div>}
+          <button type="button" className="we-menu__item we-menu__item--confirm" onClick={onConfirmAttack}>
+            Confirm
+          </button>
+          <button type="button" className="we-menu__item we-menu__item--back" onClick={onCancelConfirm}>
+            Cancel
+          </button>
         </div>
       )}
     </div>
@@ -315,7 +479,7 @@ function SidePanel({
 }: {
   selected: Unit | undefined;
   hovered: Unit | undefined;
-  forecast: ReturnType<typeof forecastCombat> | null;
+  forecast: CombatForecast | null;
   G: GameState;
 }) {
   const inspected = hovered ?? selected;
