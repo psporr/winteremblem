@@ -15,6 +15,7 @@ export interface ClassStats {
   range: number;
 }
 
+/** Stats at level 1. */
 export const CLASS_STATS: Record<ClassName, ClassStats> = {
   Swordsman: { maxHp: 24, atk: 9, def: 5, move: 3, range: 1 },
   Archer: { maxHp: 18, atk: 8, def: 3, move: 3, range: 2 },
@@ -23,3 +24,30 @@ export const CLASS_STATS: Record<ClassName, ClassStats> = {
 };
 
 export const ALL_CLASSES: ClassName[] = ['Swordsman', 'Archer', 'Lancer', 'Mage'];
+
+/** Flat stat gain per level above 1 — the same curve for every class. */
+const LEVEL_GROWTH = { atk: 1, def: 1, maxHp: 2 };
+
+/** The player squad starts stronger than a fresh wave-1 recruit. */
+export const PLAYER_START_LEVEL = 5;
+
+/** How much EXP landing an attack grants, and how much a level costs. */
+export const EXP_PER_ATTACK = 20;
+export const EXP_TO_LEVEL = 100;
+
+/**
+ * A class's stats at a given level. Move and range don't scale with level —
+ * only atk/def/maxHp do — so higher levels make units hit harder and
+ * survive longer without letting them outrun the map's pacing.
+ */
+export function statsAtLevel(className: ClassName, level: number): ClassStats {
+  const base = CLASS_STATS[className];
+  const steps = level - 1;
+  return {
+    maxHp: base.maxHp + LEVEL_GROWTH.maxHp * steps,
+    atk: base.atk + LEVEL_GROWTH.atk * steps,
+    def: base.def + LEVEL_GROWTH.def * steps,
+    move: base.move,
+    range: base.range,
+  };
+}

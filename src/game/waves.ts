@@ -1,5 +1,5 @@
 import type { GameState, Unit } from './types';
-import { ALL_CLASSES, CLASS_STATS } from './classes';
+import { ALL_CLASSES, statsAtLevel } from './classes';
 import type { ShuffleAPI } from './maps';
 import { terrainAt } from './grid';
 
@@ -28,17 +28,13 @@ function enemyCountForWave(wave: number): number {
   return Math.min(BASE_ENEMY_COUNT + Math.floor((wave - 1) / 2), MAX_ENEMIES);
 }
 
-/** Flat stat bonus applied per wave beyond the first, so later waves hit harder. */
-function scaleForWave(wave: number) {
-  const bonus = wave - 1;
-  return { atk: bonus, def: bonus, maxHp: bonus * 2 };
-}
-
 /**
  * Spawns a fresh, procedurally composed wave directly into G.units.
  * Class assignment reuses the same "shuffle once, no duplicates until the
  * pool wraps" approach as the starting Bandits, so composition is balanced
- * but different every wave.
+ * but different every wave. Enemy level equals the wave number — wave 1 is
+ * level 1, matching a fresh recruit — so difficulty scales through the same
+ * level/stat system the player squad levels up through.
  */
 export function spawnWave(G: GameState, wave: number, random: ShuffleAPI): void {
   const count = enemyCountForWave(wave);
@@ -48,12 +44,10 @@ export function spawnWave(G: GameState, wave: number, random: ShuffleAPI): void 
   }
 
   const classOrder = random.Shuffle(ALL_CLASSES);
-  const scale = scaleForWave(wave);
 
   for (let i = 0; i < count; i++) {
     const className = classOrder[i % classOrder.length];
-    const base = CLASS_STATS[className];
-    const maxHp = base.maxHp + scale.maxHp;
+    const stats = statsAtLevel(className, wave);
     const id = `enemy-w${wave}-${i}`;
 
     const unit: Unit = {
@@ -63,14 +57,16 @@ export function spawnWave(G: GameState, wave: number, random: ShuffleAPI): void 
       className,
       x: pool[i].x,
       y: pool[i].y,
-      hp: maxHp,
-      maxHp,
-      atk: base.atk + scale.atk,
-      def: base.def + scale.def,
-      move: base.move,
-      range: base.range,
+      hp: stats.maxHp,
+      maxHp: stats.maxHp,
+      atk: stats.atk,
+      def: stats.def,
+      move: stats.move,
+      range: stats.range,
       hasMoved: false,
       hasActed: false,
+      level: wave,
+      exp: 0,
     };
 
     G.units[id] = unit;

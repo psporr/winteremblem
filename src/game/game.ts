@@ -8,6 +8,7 @@ import { computeReachable, manhattan, tileKey, unitsOf } from './grid';
 import { forecastCombat } from './combat';
 import { BLESSINGS } from './blessings';
 import { spawnWave } from './waves';
+import { EXP_PER_ATTACK, EXP_TO_LEVEL, statsAtLevel } from './classes';
 
 /**
  * The slice of boardgame.io's EventsAPI we actually need. Defined locally,
@@ -63,6 +64,28 @@ function checkWaveCleared(G: GameState): void {
   }
 }
 
+/**
+ * Every attack grants EXP to whoever threw the punch, win or lose. A level
+ * up recomputes atk/def/maxHp from the class curve and heals by the maxHp
+ * gained, so leveling never feels like a step backwards. Looped rather than
+ * a single `if`, in case a future EXP source ever grants enough to cross
+ * more than one level at once.
+ */
+function grantExp(G: GameState, unit: Unit): void {
+  unit.exp += EXP_PER_ATTACK;
+  while (unit.exp >= EXP_TO_LEVEL) {
+    unit.exp -= EXP_TO_LEVEL;
+    unit.level += 1;
+    const stats = statsAtLevel(unit.className, unit.level);
+    const hpGain = stats.maxHp - unit.maxHp;
+    unit.maxHp = stats.maxHp;
+    unit.atk = stats.atk;
+    unit.def = stats.def;
+    unit.hp = Math.min(stats.maxHp, unit.hp + hpGain);
+    pushLog(G, `${unit.name} reached level ${unit.level}!`);
+  }
+}
+
 export const attackUnit = (
   { G, ctx }: { G: GameState; ctx: Ctx },
   attackerId: string,
@@ -94,6 +117,9 @@ export const attackUnit = (
     }
   }
 
+  // Reached only if the attacker survived (the attacker-dies branch above
+  // returns early), so its exp/hp changes here always land on a live unit.
+  grantExp(G, attacker);
   attacker.hasMoved = true;
   attacker.hasActed = true;
 };

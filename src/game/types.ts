@@ -5,6 +5,8 @@
  * it as plain data today, and it will be persisted to Firestore later on.
  */
 
+import type { ClassName } from './classes';
+
 export type Team = 'player' | 'enemy';
 
 export type TerrainType = 'plain' | 'forest' | 'wall';
@@ -29,8 +31,7 @@ export interface Unit {
   id: string;
   name: string;
   team: Team;
-  /** Display-only class label, e.g. "Knight". Class-driven rules come later. */
-  className: string;
+  className: ClassName;
   x: number;
   y: number;
   hp: number;
@@ -45,6 +46,9 @@ export interface Unit {
   hasMoved: boolean;
   /** Unit is finished for this turn (attacked or waited). */
   hasActed: boolean;
+  level: number;
+  /** Progress toward the next level; reaching EXP_TO_LEVEL rolls over. */
+  exp: number;
 }
 
 export interface GameState {

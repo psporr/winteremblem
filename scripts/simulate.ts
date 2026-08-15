@@ -44,7 +44,10 @@ while (actions < MAX_ACTIONS) {
     blessingIndex++;
     console.log(`  choosing blessing: ${blessing.name}`);
     client.moves.chooseBlessing(blessing.id);
-    if (G.wave > WAVE_CAP) break;
+    // G here is the pre-move snapshot; re-fetch to see the wave number the
+    // move just set, or this check is always one wave behind.
+    const waveAfter = client.getState()?.G.wave ?? G.wave;
+    if (waveAfter > WAVE_CAP) break;
     continue;
   }
 

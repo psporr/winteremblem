@@ -1,5 +1,5 @@
 import type { GameState, Team, TerrainType, Unit } from './types';
-import { ALL_CLASSES, CLASS_STATS, type ClassName } from './classes';
+import { ALL_CLASSES, PLAYER_START_LEVEL, statsAtLevel, type ClassName } from './classes';
 
 /**
  * The slice of boardgame.io's RandomAPI we actually need. Defined locally
@@ -82,7 +82,9 @@ export function buildGameState(chapter: ChapterDef, random: ShuffleAPI): GameSta
   for (const spec of chapter.units) {
     const className =
       'className' in spec ? spec.className : shuffledClasses[nextRandomClassIndex++ % shuffledClasses.length];
-    const stats = CLASS_STATS[className];
+    // The squad starts battle-tested; a fresh wave-1 enemy hasn't seen combat yet.
+    const level = spec.team === 'player' ? PLAYER_START_LEVEL : 1;
+    const stats = statsAtLevel(className, level);
 
     units[spec.id] = {
       id: spec.id,
@@ -99,6 +101,8 @@ export function buildGameState(chapter: ChapterDef, random: ShuffleAPI): GameSta
       range: stats.range,
       hasMoved: false,
       hasActed: false,
+      level,
+      exp: 0,
     };
   }
 

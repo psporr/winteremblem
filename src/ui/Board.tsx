@@ -18,6 +18,7 @@ import {
 import { forecastCombat, type CombatForecast } from '../game/combat';
 import { decideEnemyAction } from '../game/ai';
 import { BLESSINGS } from '../game/blessings';
+import { EXP_TO_LEVEL } from '../game/classes';
 import type { GameOver } from '../game/game';
 import './board.css';
 
@@ -516,10 +517,23 @@ function SidePanel({
     <div className="we-panel">
       <div className="we-panel__title">
         <strong>{inspected.name}</strong>
-        <span>{inspected.className}</span>
+        <span>
+          Lv. {inspected.level} {inspected.className}
+        </span>
       </div>
       <div className="we-panel__hp">
         HP {inspected.hp}/{inspected.maxHp}
+      </div>
+      <div className="we-panel__exp">
+        <div className="we-panel__exp-bar">
+          <div
+            className="we-panel__exp-fill"
+            style={{ width: `${(inspected.exp / EXP_TO_LEVEL) * 100}%` }}
+          />
+        </div>
+        <span>
+          {inspected.exp}/{EXP_TO_LEVEL} EXP
+        </span>
       </div>
       <dl className="we-stats">
         <div>

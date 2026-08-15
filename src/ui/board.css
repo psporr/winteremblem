@@ -299,6 +299,33 @@ body {
   color: var(--ink-dim);
 }
 
+.we-panel__exp {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.we-panel__exp-bar {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(13, 20, 32, 0.5);
+  overflow: hidden;
+}
+
+.we-panel__exp-fill {
+  display: block;
+  height: 100%;
+  background: #ffd479;
+}
+
+.we-panel__exp span {
+  font-size: 11px;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+
 .we-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -448,13 +475,20 @@ body {
   background: #4ad991;
 }
 
+/* Fixed rather than in normal flow, so it never shifts the board when it
+   mounts/unmounts — it floats as a toast instead of pushing layout. */
 .we-targeting-hint {
-  max-width: 1180px;
-  margin: 0 auto 12px;
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  width: min(320px, calc(100vw - 32px));
   padding: 10px 16px;
   border-radius: 8px;
   border: 1px solid var(--accent);
   background: var(--panel);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
   display: flex;
   align-items: center;
   justify-content: space-between;

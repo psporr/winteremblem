@@ -56,19 +56,25 @@ and the squad resets to their start tiles. Fallen units stay fallen for the
 rest of the run; there's no separate permadeath toggle because a run only ever
 has one life. The run ends when the whole squad is wiped.
 
+**Leveling.** Every attack grants EXP to whoever threw it, win or lose;
+reaching 100 EXP levels a unit up (atk/def/maxHp increase, and the unit heals
+by the HP gained). The squad starts at level 5 — battle-tested from the
+start — while enemies start at level 1 on wave 1 and level up wave-for-wave,
+so the level gap only narrows as a run goes on.
+
 ## Project layout
 
 ```
 src/game/     rules layer — no React, no rendering
   types.ts       state model and terrain table
-  classes.ts     per-class base stats, shared by fixed and randomly-cast units
+  classes.ts     per-class base stats, the level/stat growth curve, EXP constants
   maps.ts        ASCII chapter definitions -> initial state
   grid.ts        Dijkstra movement range, attack/threat range
   combat.ts      damage and counterattack forecasting
   ai.ts          CPU decision-making (one action at a time, stateless)
-  waves.ts       procedural enemy composition + difficulty scaling per wave
+  waves.ts       procedural enemy composition, wave-as-level difficulty scaling
   blessings.ts   squad-wide buffs offered after a wave clears
-  game.ts        boardgame.io game definition: moves, phases, win conditions
+  game.ts        boardgame.io game definition: moves, phases, win conditions, EXP/leveling
 src/ui/       React board, panels, styling
 scripts/      headless battle simulator
 ```
@@ -112,5 +118,5 @@ artwork drawn for this project. See [CREDITS.md](CREDITS.md).
   randomly-classed, difficulty-scaled Bandits, local play
 - Next: shop + equipment system (replacing/extending the simple blessing
   picks), Lancer and Mage sprites, Firebase Auth + Firestore save/resume
-- Later: weapon triangle, growth/leveling, more maps
+- Later: weapon triangle, more maps
 - Later: online co-op for 5 players
