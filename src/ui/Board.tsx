@@ -4,6 +4,7 @@ import type { BoardProps } from 'boardgame.io/react';
 import type { GameState, TerrainType, Unit } from '../game/types';
 import { PLAYER_ID } from '../game/types';
 import terrainTileset from '../assets/terrain/toen-terrain.png';
+import { UNIT_SPRITES, SPRITE_DISPLAY_HEIGHT } from './unitSprites';
 import {
   computeReachable,
   computeThreatTiles,
@@ -257,15 +258,33 @@ export function Board({ G, ctx, moves, events }: BoardProps<GameState>) {
 
 function UnitToken({ unit }: { unit: Unit }) {
   const hpRatio = unit.hp / unit.maxHp;
+  const sprite = UNIT_SPRITES[unit.className];
+
   const classes = [
     'we-unit',
     `we-unit--${unit.team}`,
     unit.hasActed ? 'we-unit--spent' : '',
+    sprite ? '' : 'we-unit--glyph',
   ].filter(Boolean);
 
   return (
     <div className={classes.join(' ')}>
-      <span className="we-unit__glyph">{unit.name.charAt(0)}</span>
+      {sprite ? (
+        <span
+          className="we-unit__sprite"
+          style={
+            {
+              '--frame-w': `${sprite.frameWidth}px`,
+              '--frame-h': `${sprite.frameHeight}px`,
+              '--frame-count': sprite.frames,
+              '--sprite-src': `url(${sprite.src})`,
+              '--sprite-scale': SPRITE_DISPLAY_HEIGHT / sprite.frameHeight,
+            } as CSSProperties
+          }
+        />
+      ) : (
+        <span className="we-unit__glyph">{unit.name.charAt(0)}</span>
+      )}
       <span className="we-unit__hp">
         <span className="we-unit__hp-fill" style={{ width: `${hpRatio * 100}%` }} />
       </span>

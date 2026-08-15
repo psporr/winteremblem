@@ -165,11 +165,11 @@ body {
   color: #0d1420;
 }
 
-.we-unit--player {
+.we-unit--glyph.we-unit--player {
   background: linear-gradient(160deg, #9ec5ff, #5b8def);
 }
 
-.we-unit--enemy {
+.we-unit--glyph.we-unit--enemy {
   background: linear-gradient(160deg, #ff9aa2, #d9434f);
 }
 
@@ -180,6 +180,39 @@ body {
 .we-unit__glyph {
   font-size: 18px;
   line-height: 1;
+}
+
+.we-unit__sprite {
+  width: calc(var(--frame-w) * var(--sprite-scale));
+  height: calc(var(--frame-h) * var(--sprite-scale));
+  background-image: var(--sprite-src);
+  background-repeat: no-repeat;
+  background-size:
+    calc(var(--frame-w) * var(--frame-count) * var(--sprite-scale))
+    calc(var(--frame-h) * var(--sprite-scale));
+  image-rendering: pixelated;
+  animation: we-sprite-cycle 0.9s steps(var(--frame-count)) infinite;
+}
+
+@keyframes we-sprite-cycle {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: calc(var(--frame-w) * var(--frame-count) * var(--sprite-scale) * -1) 0;
+  }
+}
+
+/* Same artwork, recolored toward red so enemy units read as hostile without
+   needing a second hand-drawn palette per class. */
+.we-unit--enemy .we-unit__sprite {
+  filter: grayscale(0.25) sepia(1) hue-rotate(-50deg) saturate(3.5) brightness(0.95);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .we-unit__sprite {
+    animation-play-state: paused;
+  }
 }
 
 .we-unit__hp {

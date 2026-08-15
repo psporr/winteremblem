@@ -9,3 +9,6 @@ by Andre Mari Coppola ([itch.io](https://toen.itch.io/toens-medieval-strategy),
 [CC-BY 4.0](http://creativecommons.org/licenses/by/4.0/). Only the plain grass,
 forest, and mountain/wall tiles were extracted from the original 7×52 sheet;
 no changes were made to the sprites themselves.
+
+**Unit sprites** (`src/assets/units/`) — original artwork drawn for this
+project by a friend of the developer. No external license applies.

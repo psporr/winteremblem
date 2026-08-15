@@ -82,11 +82,12 @@ the root.
 
 ## Credits
 
-Terrain art is adapted from a third-party CC-BY pack — see [CREDITS.md](CREDITS.md).
+Terrain art is adapted from a third-party CC-BY pack; unit sprites are original
+artwork drawn for this project. See [CREDITS.md](CREDITS.md).
 
 ## Roadmap
 
-- v1 (current): one chapter, 4 player units vs 5 CPU units, local play
-- Next: Firebase Auth + Firestore save/resume, more chapters
+- v1 (current): one chapter, 2 player units vs 2 CPU units, local play
+- Next: Firebase Auth + Firestore save/resume, more chapters, more classes
 - Later: weapon triangle, classes and growth, inventory, permadeath toggle
 - Later: online co-op for 5 players
