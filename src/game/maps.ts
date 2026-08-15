@@ -113,7 +113,7 @@ export function buildGameState(chapter: ChapterDef, random: ShuffleAPI): GameSta
     height: tiles.length,
     tiles,
     units,
-    log: [`${chapter.name} — ${chapter.objective}`],
+    log: ['Wave 1 Starts'],
     wave: 1,
     awaitingBlessing: false,
   };
