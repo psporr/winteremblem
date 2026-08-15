@@ -105,18 +105,22 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.we-tile--plain {
-  background: #3c4c63;
-}
-
-.we-tile--forest {
-  background: #2f5741;
+  /* Forest and wall sprites are drawn to sit on a grass base tile, with
+     transparent corners around the tree/rock shape — so every tile gets a
+     grass layer underneath the terrain-specific sprite on top. */
+  background-image: var(--terrain-src), var(--terrain-src);
+  background-repeat: no-repeat, no-repeat;
+  /* Tileset is 3 source tiles wide; each is var(--tile) once scaled up. */
+  background-size:
+    calc(var(--tile) * 3) var(--tile),
+    calc(var(--tile) * 3) var(--tile);
+  background-position:
+    calc(var(--tile) * var(--terrain-index) * -1) 0,
+    0 0;
+  image-rendering: pixelated;
 }
 
 .we-tile--wall {
-  background: #1b2433;
   cursor: default;
 }
 

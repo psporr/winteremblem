@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import type { BoardProps } from 'boardgame.io/react';
 
-import type { GameState, Unit } from '../game/types';
+import type { GameState, TerrainType, Unit } from '../game/types';
 import { PLAYER_ID } from '../game/types';
+import terrainTileset from '../assets/terrain/toen-terrain.png';
 import {
   computeReachable,
   computeThreatTiles,
@@ -22,6 +23,16 @@ import './board.css';
 const ENEMY_ACTION_DELAY = 550;
 
 const EMPTY_REACHABLE = new Map<string, ReachableTile>();
+
+/**
+ * Left-to-right tile order in toen-terrain.png, cropped from Toen's Medieval
+ * Strategy Sprite Pack (CC-BY 4.0, Andre Mari Coppola — see CREDITS.md).
+ */
+const TERRAIN_SPRITE_INDEX: Record<TerrainType, number> = {
+  plain: 0,
+  forest: 1,
+  wall: 2,
+};
 
 export function Board({ G, ctx, moves, events }: BoardProps<GameState>) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -136,7 +147,12 @@ export function Board({ G, ctx, moves, events }: BoardProps<GameState>) {
         <div className="we-board-wrap">
           <div
             className="we-board"
-            style={{ gridTemplateColumns: `repeat(${G.width}, var(--tile))` }}
+            style={
+              {
+                gridTemplateColumns: `repeat(${G.width}, var(--tile))`,
+                '--terrain-src': `url(${terrainTileset})`,
+              } as CSSProperties
+            }
           >
             {G.tiles.map((row, y) =>
               row.map((terrainType, x) => {
@@ -160,6 +176,7 @@ export function Board({ G, ctx, moves, events }: BoardProps<GameState>) {
                     onMouseEnter={() => setHoveredTargetId(occupant?.id ?? null)}
                     onMouseLeave={() => setHoveredTargetId(null)}
                     title={`${terrainAt(G, x, y).name} (${x}, ${y})`}
+                    style={{ '--terrain-index': TERRAIN_SPRITE_INDEX[terrainType] } as CSSProperties}
                   >
                     {occupant && <UnitToken unit={occupant} />}
                   </button>

@@ -80,6 +80,10 @@ The Vite `base` is set to `/winteremblem/` for production builds (see
 `vite.config.ts`) to match that project-site URL; the dev server still runs at
 the root.
 
+## Credits
+
+Terrain art is adapted from a third-party CC-BY pack — see [CREDITS.md](CREDITS.md).
+
 ## Roadmap
 
 - v1 (current): one chapter, 4 player units vs 5 CPU units, local play
