@@ -49,27 +49,10 @@ body {
   color: var(--ink-dim);
 }
 
-.we-objective {
-  margin: 4px 0 0;
-  color: var(--ink-dim);
-  font-size: 14px;
-}
-
 .we-header-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.we-wave-badge {
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--panel-edge);
-  background: var(--panel);
-  color: var(--accent);
-  font-weight: 700;
-  font-size: 13px;
-  white-space: nowrap;
 }
 
 .we-iconbutton {
@@ -87,6 +70,16 @@ body {
 .we-iconbutton[aria-pressed='true'] {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.we-iconbutton--icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
 }
 
 .we-layout {

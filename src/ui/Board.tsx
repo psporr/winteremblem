@@ -293,34 +293,39 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   return (
     <div className="we-app">
       <header className="we-header">
-        <div>
-          <h1>
-            Winter Emblem <span className="we-version">v{GAME_VERSION}</span>
-          </h1>
-          <p className="we-objective">{G.objective}</p>
-        </div>
+        <h1>
+          Winter Emblem <span className="we-version">v{GAME_VERSION}</span>
+        </h1>
         <div className="we-header-actions">
-          <span className="we-wave-badge">Wave {G.wave}</span>
           <button
             type="button"
-            className="we-iconbutton"
+            className="we-iconbutton we-iconbutton--icon"
             aria-pressed={showThreat}
+            aria-label={`${showThreat ? 'Hide' : 'Show'} enemy range`}
             title={`${showThreat ? 'Hide' : 'Show'} enemy range`}
             onClick={() => setShowThreat((value) => !value)}
           >
-            {showThreat ? 'Hide range' : 'Enemy range'}
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M12 5c-5.05 0-9.27 3.11-11 7.5 1.73 4.39 5.95 7.5 11 7.5s9.27-3.11 11-7.5C21.27 8.11 17.05 5 12 5zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"
+              />
+            </svg>
           </button>
           {isPlayerPhase && mode !== 'animating' && (
             <button
               type="button"
-              className="we-iconbutton"
+              className="we-iconbutton we-iconbutton--icon"
+              aria-label="End turn"
               title="End turn"
               onClick={() => {
                 clearSelection();
                 events.endTurn?.();
               }}
             >
-              End turn
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path fill="currentColor" d="M6 5v14l8-7-8-7zm10 0v14h2V5h-2z" />
+              </svg>
             </button>
           )}
         </div>
