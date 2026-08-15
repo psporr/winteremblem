@@ -1,5 +1,7 @@
 :root {
   --tile: 54px;
+  --tile-gap: 2px;
+  --board-pad: 8px;
   --ink: #e8eef6;
   --ink-dim: #93a4bb;
   --bg: #0d1420;
@@ -88,10 +90,34 @@ body {
 
 .we-board {
   display: grid;
-  gap: 2px;
-  padding: 8px;
+  gap: var(--tile-gap);
+  padding: var(--board-pad);
   background: var(--panel-edge);
   border-radius: 10px;
+  position: relative;
+}
+
+/* Absolutely positioned, so it's excluded from the tile grid's own
+   auto-placement despite being a direct child of a grid container. */
+.we-unit-layer {
+  position: absolute;
+  inset: var(--board-pad);
+  pointer-events: none;
+}
+
+.we-unit-slot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--tile);
+  height: var(--tile);
+  transition: transform 260ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .we-unit-slot {
+    transition: none;
+  }
 }
 
 .we-tile {

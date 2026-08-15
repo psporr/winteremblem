@@ -178,12 +178,27 @@ export function Board({ G, ctx, moves, events }: BoardProps<GameState>) {
                     onMouseLeave={() => setHoveredTargetId(null)}
                     title={`${terrainAt(G, x, y).name} (${x}, ${y})`}
                     style={{ '--terrain-index': TERRAIN_SPRITE_INDEX[terrainType] } as CSSProperties}
-                  >
-                    {occupant && <UnitToken unit={occupant} />}
-                  </button>
+                  />
                 );
               }),
             )}
+
+            {/* Positioned separately from the tile grid, keyed by unit id, so
+                moving a unit slides its token to the new cell instead of the
+                tile-button remount that would otherwise cause an instant jump. */}
+            <div className="we-unit-layer">
+              {Object.values(G.units).map((unit) => (
+                <div
+                  key={unit.id}
+                  className="we-unit-slot"
+                  style={{
+                    transform: `translate(calc((var(--tile) + var(--tile-gap)) * ${unit.x}), calc((var(--tile) + var(--tile-gap)) * ${unit.y}))`,
+                  }}
+                >
+                  <UnitToken unit={unit} />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
