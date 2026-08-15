@@ -293,19 +293,30 @@ body {
   }
 }
 
-.we-unit__float-dmg {
+.we-unit__float-num {
   position: absolute;
-  top: -4px;
+  top: -6px;
   left: 50%;
-  color: var(--danger);
+  z-index: 3;
+  padding: 1px 7px;
+  border-radius: 8px;
+  background: rgba(8, 12, 20, 0.78);
   font-weight: 800;
   font-size: 15px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
   pointer-events: none;
-  animation: we-float-dmg 700ms ease-out forwards;
+  animation: we-float-num 700ms ease-out forwards;
 }
 
-@keyframes we-float-dmg {
+.we-unit__float-num--damage {
+  color: #ff4d4d;
+}
+
+.we-unit__float-num--heal {
+  color: #4ad991;
+}
+
+@keyframes we-float-num {
   0% {
     opacity: 0;
     transform: translate(-50%, 0) scale(0.8);
@@ -322,7 +333,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .we-unit--shake,
-  .we-unit__float-dmg {
+  .we-unit__float-num {
     animation: none;
   }
 
@@ -570,10 +581,16 @@ body {
 
 /* FE-style forecast card: two portraits facing off, HP arrows, the stat
    each side's number came from. Same visual treatment as .we-menu (card,
-   border, mount animation) but wide enough for both sides. */
+   border, mount animation) but wide enough for both sides.
+   Centered on the board (not anchored to either unit's tile) so it can
+   never run off the edge of our narrow 6-wide board regardless of where
+   the attacker or target stand. */
 .we-forecast-card {
   position: absolute;
-  top: 0;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 6;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -584,21 +601,24 @@ body {
   backdrop-filter: blur(3px);
   border-radius: 10px;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
-  animation: we-menu-in 140ms ease;
+  animation: we-forecast-in 140ms ease;
+}
+
+@keyframes we-forecast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .we-forecast-card {
     animation: none;
   }
-}
-
-.we-panel-anchor--right .we-forecast-card {
-  left: calc(var(--tile) + 8px);
-}
-
-.we-panel-anchor--left .we-forecast-card {
-  left: calc(-220px - 8px);
 }
 
 .we-forecast-card__matchup {

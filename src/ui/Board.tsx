@@ -62,7 +62,8 @@ interface CombatAnim {
   attackerHp: number;
   targetHp: number;
   shakingId: string | null;
-  floatingDamage: { unitId: string; value: number } | null;
+  /** `kind` picks the color: red for damage, green for a future heal source. */
+  floatingNumber: { unitId: string; value: number; kind: 'damage' | 'heal' } | null;
 }
 
 export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
@@ -239,7 +240,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
       attackerHp: selected.hp,
       targetHp: previewTarget.hp,
       shakingId: null,
-      floatingDamage: null,
+      floatingNumber: null,
     });
 
     // Beat 1, next tick so the pre-hit frame actually paints first: the hit lands.
@@ -250,7 +251,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
               ...prev,
               targetHp: forecast.defenderHpAfter,
               shakingId: targetId,
-              floatingDamage: { unitId: targetId, value: forecast.damageDealt },
+              floatingNumber: { unitId: targetId, value: forecast.damageDealt, kind: 'damage' },
             }
           : prev,
       );
@@ -265,7 +266,11 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 ...prev,
                 attackerHp: forecast.attackerHpAfter,
                 shakingId: attackerId,
-                floatingDamage: { unitId: attackerId, value: forecast.counterDamage as number },
+                floatingNumber: {
+                  unitId: attackerId,
+                  value: forecast.counterDamage as number,
+                  kind: 'damage',
+                },
               }
             : prev,
         );
@@ -384,10 +389,8 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                     ? combatAnim.targetHp
                     : undefined;
                 const shaking = combatAnim?.shakingId === unit.id;
-                const floatingDamage =
-                  combatAnim?.floatingDamage?.unitId === unit.id
-                    ? combatAnim.floatingDamage.value
-                    : null;
+                const floatingNumber =
+                  combatAnim?.floatingNumber?.unitId === unit.id ? combatAnim.floatingNumber : null;
 
                 return (
                   <div
@@ -401,26 +404,31 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                       unit={unit}
                       hpOverride={hpOverride}
                       shaking={shaking}
-                      floatingDamage={floatingDamage}
+                      floatingNumber={floatingNumber}
                     />
                   </div>
                 );
               })}
             </div>
 
-            {selected && (mode === 'menu' || mode === 'confirm') && (
+            {selected && mode === 'menu' && (
               <ActionPanel
                 unit={selected}
                 boardWidth={G.width}
-                mode={mode}
                 canAttack={attackTargets.length > 0}
-                forecast={forecast}
-                target={previewTarget}
                 onAttack={handleAttackPressed}
                 onWait={handleWaitPressed}
                 onBack={handleBackPressed}
-                onCancelConfirm={handleCancelConfirm}
-                onConfirmAttack={handleConfirmAttack}
+              />
+            )}
+
+            {mode === 'confirm' && selected && previewTarget && forecast && (
+              <ForecastCard
+                attacker={selected}
+                target={previewTarget}
+                forecast={forecast}
+                onConfirm={handleConfirmAttack}
+                onCancel={handleCancelConfirm}
               />
             )}
           </div>
@@ -482,27 +490,17 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
 function ActionPanel({
   unit,
   boardWidth,
-  mode,
   canAttack,
-  forecast,
-  target,
   onAttack,
   onWait,
   onBack,
-  onCancelConfirm,
-  onConfirmAttack,
 }: {
   unit: Unit;
   boardWidth: number;
-  mode: 'menu' | 'confirm';
   canAttack: boolean;
-  forecast: CombatForecast | null;
-  target: Unit | undefined;
   onAttack: () => void;
   onWait: () => void;
   onBack: () => void;
-  onCancelConfirm: () => void;
-  onConfirmAttack: () => void;
 }) {
   const side = unit.x < boardWidth / 2 ? 'right' : 'left';
 
@@ -513,49 +511,66 @@ function ActionPanel({
         transform: `translate(calc((var(--tile) + var(--tile-gap)) * ${unit.x}), calc((var(--tile) + var(--tile-gap)) * ${unit.y}))`,
       }}
     >
-      {mode === 'menu' && (
-        <div className="we-menu">
-          {canAttack && (
-            <button type="button" className="we-menu__item" onClick={onAttack}>
-              Attack
-            </button>
-          )}
-          <button type="button" className="we-menu__item" onClick={onWait}>
-            Wait
+      <div className="we-menu">
+        {canAttack && (
+          <button type="button" className="we-menu__item" onClick={onAttack}>
+            Attack
           </button>
-          <button type="button" className="we-menu__item we-menu__item--back" onClick={onBack}>
-            Back
-          </button>
-        </div>
-      )}
+        )}
+        <button type="button" className="we-menu__item" onClick={onWait}>
+          Wait
+        </button>
+        <button type="button" className="we-menu__item we-menu__item--back" onClick={onBack}>
+          Back
+        </button>
+      </div>
+    </div>
+  );
+}
 
-      {mode === 'confirm' && forecast && target && (
-        <div className="we-forecast-card">
-          <div className="we-forecast-card__matchup">
-            <ForecastSide
-              unit={unit}
-              hpAfter={forecast.attackerWillDie ? 0 : forecast.attackerHpAfter}
-              statLabel="Atk"
-              statValue={forecast.damageDealt}
-            />
-            <span className="we-forecast-card__vs">VS</span>
-            <ForecastSide
-              unit={target}
-              hpAfter={forecast.defenderHpAfter}
-              statLabel={forecast.counterDamage !== null ? 'Counter' : 'No counter'}
-              statValue={forecast.counterDamage}
-            />
-          </div>
-          {forecast.willKill && <div className="we-menu__kill">Lethal</div>}
-          {forecast.attackerWillDie && <div className="we-menu__danger">You would die</div>}
-          <button type="button" className="we-menu__item we-menu__item--confirm" onClick={onConfirmAttack}>
-            Confirm
-          </button>
-          <button type="button" className="we-menu__item we-menu__item--back" onClick={onCancelConfirm}>
-            Cancel
-          </button>
-        </div>
-      )}
+/**
+ * The combat forecast, centered over the board rather than anchored beside
+ * either unit — anchoring it to a unit's tile meant it could run off the
+ * edge of our narrow 6-wide board and get clipped by the viewport.
+ */
+function ForecastCard({
+  attacker,
+  target,
+  forecast,
+  onConfirm,
+  onCancel,
+}: {
+  attacker: Unit;
+  target: Unit;
+  forecast: CombatForecast;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="we-forecast-card">
+      <div className="we-forecast-card__matchup">
+        <ForecastSide
+          unit={attacker}
+          hpAfter={forecast.attackerWillDie ? 0 : forecast.attackerHpAfter}
+          statLabel="Atk"
+          statValue={forecast.damageDealt}
+        />
+        <span className="we-forecast-card__vs">VS</span>
+        <ForecastSide
+          unit={target}
+          hpAfter={forecast.defenderHpAfter}
+          statLabel={forecast.counterDamage !== null ? 'Counter' : 'No counter'}
+          statValue={forecast.counterDamage}
+        />
+      </div>
+      {forecast.willKill && <div className="we-menu__kill">Lethal</div>}
+      {forecast.attackerWillDie && <div className="we-menu__danger">You would die</div>}
+      <button type="button" className="we-menu__item we-menu__item--confirm" onClick={onConfirm}>
+        Confirm
+      </button>
+      <button type="button" className="we-menu__item we-menu__item--back" onClick={onCancel}>
+        Cancel
+      </button>
     </div>
   );
 }
@@ -622,13 +637,13 @@ function UnitToken({
   unit,
   hpOverride,
   shaking,
-  floatingDamage,
+  floatingNumber,
 }: {
   unit: Unit;
   /** Shown instead of unit.hp while a confirmed attack is animating. */
   hpOverride?: number;
   shaking?: boolean;
-  floatingDamage?: number | null;
+  floatingNumber?: { value: number; kind: 'damage' | 'heal' } | null;
 }) {
   const displayedHp = hpOverride ?? unit.hp;
   const hpRatio = Math.max(0, displayedHp) / unit.maxHp;
@@ -663,9 +678,13 @@ function UnitToken({
       <span className="we-unit__hp">
         <span className="we-unit__hp-fill" style={{ width: `${hpRatio * 100}%` }} />
       </span>
-      {floatingDamage != null && (
-        <span key={floatingDamage} className="we-unit__float-dmg">
-          -{floatingDamage}
+      {floatingNumber != null && (
+        <span
+          key={`${floatingNumber.kind}-${floatingNumber.value}`}
+          className={`we-unit__float-num we-unit__float-num--${floatingNumber.kind}`}
+        >
+          {floatingNumber.kind === 'heal' ? '+' : '-'}
+          {floatingNumber.value}
         </span>
       )}
     </div>
