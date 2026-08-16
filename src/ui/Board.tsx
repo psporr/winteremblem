@@ -547,10 +547,10 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   return (
     <div className="we-app">
       <header className="we-header">
-        {/* Names the battle you're in, both modes — the game's own name (and
-            version) live on the title screen, where there's room for them.
-            "BIBI's WinterEmblem" doesn't fit beside the icon row on a phone. */}
-        <h1>{G.chapterShortName}</h1>
+        {/* Campaign names the chapter you're in; roguelike is always the
+            same endless run, so it just says the mode. The game's own name
+            (and version) live on the title screen, where there's room. */}
+        <h1>{G.mode === 'campaign' ? G.chapterShortName : 'Roguelike'}</h1>
         <div className="we-header-actions">
           <button
             type="button"
@@ -1416,7 +1416,6 @@ function SidePanel({
             : 'Ready'}
         </span>
       </div>
-      <div className="we-panel__terrain">On {cover.name.toLowerCase()}</div>
 
       {forecast && selected && hovered && (
         <div className="we-forecast">
