@@ -88,8 +88,10 @@ type CombatAnim = Record<
      * span's React key changes even when two consecutive beats deal the
      * same value (e.g. Sword Dance's two equal hits), forcing a remount so
      * the pop-in animation replays instead of being silently skipped.
+     * `crit` marks a skill's own damage hit (not its counter-retaliation)
+     * for the bigger, RPG-critical-hit styled number.
      */
-    floatingNumber: { value: number; kind: 'damage' | 'heal'; seq: number } | null;
+    floatingNumber: { value: number; kind: 'damage' | 'heal'; seq: number; crit: boolean } | null;
   }
 >;
 
@@ -98,7 +100,7 @@ interface BeatHit {
   unitId: string;
   hp: number;
   shake?: boolean;
-  floatingNumber?: { value: number; kind: 'damage' | 'heal' };
+  floatingNumber?: { value: number; kind: 'damage' | 'heal'; crit?: boolean };
 }
 
 export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
@@ -364,13 +366,15 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
    * reflowed before it goes back on, or a second hit within the same combat
    * wouldn't replay the animation. Safe to drive imperatively: .we-board's
    * React-owned className is a constant, so React never rewrites it here.
+   * `big` is for a skill's own crit hit — a heavier knock than a plain
+   * attack or a counter-retaliation gets.
    */
-  function shakeBoard() {
+  function shakeBoard(big = false) {
     const board = boardRef.current;
     if (!board) return;
-    board.classList.remove('we-board--shake');
+    board.classList.remove('we-board--shake', 'we-board--shake-big');
     void board.offsetWidth;
-    board.classList.add('we-board--shake');
+    board.classList.add(big ? 'we-board--shake-big' : 'we-board--shake');
   }
 
   /**
@@ -434,7 +438,9 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
               next[hit.unitId] = {
                 hp: hit.hp,
                 shaking: hit.shake ?? false,
-                floatingNumber: hit.floatingNumber ? { ...hit.floatingNumber, seq: i } : null,
+                floatingNumber: hit.floatingNumber
+                  ? { ...hit.floatingNumber, seq: i, crit: hit.floatingNumber.crit ?? false }
+                  : null,
               };
             }
             return next;
@@ -452,7 +458,9 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
               particlesRef.current?.burst(target.x, target.y, 'damage', burstVariant);
             }
           }
-          if (beat.some((hit) => hit.shake)) shakeBoard();
+          if (beat.some((hit) => hit.shake)) {
+            shakeBoard(beat.some((hit) => hit.floatingNumber?.crit));
+          }
 
           if (participants) {
             const hitIds = beat.map((hit) => hit.unitId);
@@ -508,12 +516,12 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
         const dmg1 = computeDamage(G, unit, target);
         const hpAfter1 = Math.max(0, target.hp - dmg1);
         const beats: BeatHit[][] = [
-          [{ unitId: target.id, hp: hpAfter1, shake: true, floatingNumber: { value: dmg1, kind: 'damage' } }],
+          [{ unitId: target.id, hp: hpAfter1, shake: true, floatingNumber: { value: dmg1, kind: 'damage', crit: true } }],
         ];
         if (hpAfter1 > 0) {
           const dmg2 = computeDamage(G, unit, { ...target, hp: hpAfter1 });
           const hpAfter2 = Math.max(0, hpAfter1 - dmg2);
-          beats.push([{ unitId: target.id, hp: hpAfter2, shake: true, floatingNumber: { value: dmg2, kind: 'damage' } }]);
+          beats.push([{ unitId: target.id, hp: hpAfter2, shake: true, floatingNumber: { value: dmg2, kind: 'damage', crit: true } }]);
           if (hpAfter2 > 0 && canCounter(unit, target)) {
             const counterDmg = computeCounterDamage(G, target, unit);
             beats.push([
@@ -529,7 +537,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
         const dmg = Math.max(1, effectiveStats(unit).atk - effectiveStats(target).def);
         const hpAfter = Math.max(0, target.hp - dmg);
         const beats: BeatHit[][] = [
-          [{ unitId: target.id, hp: hpAfter, shake: true, floatingNumber: { value: dmg, kind: 'damage' } }],
+          [{ unitId: target.id, hp: hpAfter, shake: true, floatingNumber: { value: dmg, kind: 'damage', crit: true } }],
         ];
         if (hpAfter > 0 && canCounter(unit, target)) {
           const counterDmg = computeCounterDamage(G, target, unit);
@@ -545,7 +553,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
         const dmg = computeDamage(G, unit, target) + SNIPE_BONUS;
         return {
           startingHp: { [target.id]: target.hp },
-          beats: [[{ unitId: target.id, hp: Math.max(0, target.hp - dmg), shake: true, floatingNumber: { value: dmg, kind: 'damage' } }]],
+          beats: [[{ unitId: target.id, hp: Math.max(0, target.hp - dmg), shake: true, floatingNumber: { value: dmg, kind: 'damage', crit: true } }]],
         };
       }
 
@@ -557,7 +565,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
         const beat: BeatHit[] = hits.map((hitTarget) => {
           startingHp[hitTarget.id] = hitTarget.hp;
           const dmg = Math.max(1, Math.round(computeDamage(G, unit, hitTarget) * NOVA_DAMAGE_MULTIPLIER));
-          return { unitId: hitTarget.id, hp: Math.max(0, hitTarget.hp - dmg), shake: true, floatingNumber: { value: dmg, kind: 'damage' } };
+          return { unitId: hitTarget.id, hp: Math.max(0, hitTarget.hp - dmg), shake: true, floatingNumber: { value: dmg, kind: 'damage', crit: true } };
         });
         return { startingHp, beats: [beat] };
       }
@@ -567,7 +575,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
         const dmg = computeDamage(G, unit, target);
         const hpAfter = Math.max(0, target.hp - dmg);
         const beats: BeatHit[][] = [
-          [{ unitId: target.id, hp: hpAfter, shake: true, floatingNumber: { value: dmg, kind: 'damage' } }],
+          [{ unitId: target.id, hp: hpAfter, shake: true, floatingNumber: { value: dmg, kind: 'damage', crit: true } }],
         ];
         if (hpAfter > 0 && canCounter(unit, target)) {
           const counterDmg = computeCounterDamage(G, target, unit);
@@ -1403,7 +1411,7 @@ function UnitToken({
   /** Shown instead of unit.hp while a confirmed attack is animating. */
   hpOverride?: number;
   shaking?: boolean;
-  floatingNumber?: { value: number; kind: 'damage' | 'heal'; seq: number } | null;
+  floatingNumber?: { value: number; kind: 'damage' | 'heal'; seq: number; crit: boolean } | null;
 }) {
   const displayedHp = hpOverride ?? unit.hp;
   const hpRatio = Math.max(0, displayedHp) / unit.maxHp;
@@ -1452,7 +1460,7 @@ function UnitToken({
       {floatingNumber != null && (
         <span
           key={`${floatingNumber.kind}-${floatingNumber.seq}`}
-          className={`we-unit__float-num we-unit__float-num--${floatingNumber.kind}`}
+          className={`we-unit__float-num we-unit__float-num--${floatingNumber.kind}${floatingNumber.crit ? ' we-unit__float-num--crit' : ''}`}
         >
           {floatingNumber.kind === 'heal' ? '+' : '-'}
           {floatingNumber.value}

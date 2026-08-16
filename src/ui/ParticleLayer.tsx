@@ -43,9 +43,10 @@ const SKILL_ACCENT: Record<BurstKind, string> = {
 };
 
 const PARTICLES_PER_BURST = 14;
-const SKILL_SCATTER_PARTICLES = 22;
-/** Evenly spaced shards forming the expanding ring — a skill-only flourish. */
-const SKILL_RING_PARTICLES = 14;
+const SKILL_SCATTER_PARTICLES = 36;
+/** Evenly spaced shards forming each expanding ring — a skill-only flourish. */
+const SKILL_RING_INNER_PARTICLES = 18;
+const SKILL_RING_OUTER_PARTICLES = 22;
 /** px/s² — enough that shards arc and fall rather than drifting flatly outward. */
 const GRAVITY = 260;
 
@@ -147,6 +148,11 @@ export const ParticleLayer = forwardRef<ParticleBurstHandle, { cols: number }>(f
 
         const colors = variant === 'skill' ? [...PALETTE[kind], SKILL_ACCENT[kind]] : PALETTE[kind];
         const scatterCount = variant === 'skill' ? SKILL_SCATTER_PARTICLES : PARTICLES_PER_BURST;
+        // Skill shards run bigger too — not just more of them — so a skill
+        // hit reads as heavier debris, not just a denser version of the same
+        // spray.
+        const sizeBase = variant === 'skill' ? 4 : 3;
+        const sizeJitter = variant === 'skill' ? 3 : 2;
 
         for (let i = 0; i < scatterCount; i += 1) {
           const angle = Math.random() * Math.PI * 2;
@@ -160,19 +166,20 @@ export const ParticleLayer = forwardRef<ParticleBurstHandle, { cols: number }>(f
             vy: Math.sin(angle) * speed - 40,
             life: maxLife,
             maxLife,
-            size: 3 + Math.random() * 2,
+            size: sizeBase + Math.random() * sizeJitter,
             color: colors[Math.floor(Math.random() * colors.length)],
             gravity: true,
           });
         }
 
-        // The skill flourish: a clean ring of shards launched at even angles
-        // and immune to gravity, so it reads as a brief magic-circle pulse
-        // radiating outward rather than more scatter falling into the pile.
+        // The skill flourish: two concentric rings of shards launched at even
+        // angles and immune to gravity, so it reads as a double magic-circle
+        // pulse radiating outward — an inner ring that pops fast and tight,
+        // and a slower, farther-reaching outer ring right behind it.
         if (variant === 'skill') {
-          for (let i = 0; i < SKILL_RING_PARTICLES; i += 1) {
-            const angle = (i / SKILL_RING_PARTICLES) * Math.PI * 2;
-            const speed = 150 + Math.random() * 30;
+          for (let i = 0; i < SKILL_RING_INNER_PARTICLES; i += 1) {
+            const angle = (i / SKILL_RING_INNER_PARTICLES) * Math.PI * 2;
+            const speed = 160 + Math.random() * 30;
             const maxLife = 0.3 + Math.random() * 0.08;
             particlesRef.current.push({
               x: centreX,
@@ -181,8 +188,24 @@ export const ParticleLayer = forwardRef<ParticleBurstHandle, { cols: number }>(f
               vy: Math.sin(angle) * speed,
               life: maxLife,
               maxLife,
-              size: 2.5,
+              size: 3,
               color: SKILL_ACCENT[kind],
+              gravity: false,
+            });
+          }
+          for (let i = 0; i < SKILL_RING_OUTER_PARTICLES; i += 1) {
+            const angle = (i / SKILL_RING_OUTER_PARTICLES) * Math.PI * 2 + Math.PI / SKILL_RING_OUTER_PARTICLES;
+            const speed = 260 + Math.random() * 40;
+            const maxLife = 0.4 + Math.random() * 0.1;
+            particlesRef.current.push({
+              x: centreX,
+              y: centreY,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              life: maxLife,
+              maxLife,
+              size: 3.5,
+              color: colors[Math.floor(Math.random() * colors.length)],
               gravity: false,
             });
           }
