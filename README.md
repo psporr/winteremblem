@@ -43,13 +43,13 @@ Command flow follows classic Fire Emblem, tuned for touch:
   their post-combat values, attack/counter damage — before **Confirm** commits
   it. **Cancel** backs out to target selection.
 - **Tap a skill** to highlight its valid targets — red for an enemy skill,
-  green for an ally one (Heal, Dance) — then tap one for a plain-text preview
-  card before **Confirm**. Skills resolve instantly, no animated beats, and go
-  on a 3-turn cooldown after use.
-- **Confirming a player attack plays it out in beats**, not instantly: the hit
-  lands (floating damage number, HP bar drains, a brief shake), then — if the
-  target survives and can strike back — the counter lands the same way, before
-  the result actually applies. Enemy attacks still resolve instantly for now.
+  green for an ally one (Heal, Dance) — then tap one for a preview card (e.g.
+  "Two hits for 10 each") before **Confirm**. Goes on a 3-turn cooldown after use.
+- **Confirming an attack or a damage/heal skill plays it out in beats**, not
+  instantly: each hit lands one at a time (floating number, HP bar drains or
+  rises, a brief shake on damage) before the result actually applies — Sword
+  Dance shows two beats, Nova shows every enemy in the blast taking damage at
+  once. Enemy attacks animate the same way now, not just the player's.
 - **Tap Back** in the menu to undo the move entirely and reconsider — the unit
   returns to where it started, free to move again.
 - **Wait** ends a unit's turn where it stands. The phase ends automatically once

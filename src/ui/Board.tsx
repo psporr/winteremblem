@@ -15,12 +15,23 @@ import {
   unitsOf,
   type ReachableTile,
 } from '../game/grid';
-import { forecastCombat, type CombatForecast } from '../game/combat';
+import { canCounter, computeDamage, forecastCombat, type CombatForecast } from '../game/combat';
 import { decideEnemyAction } from '../game/ai';
 import { BLESSINGS } from '../game/blessings';
 import { EXP_TO_LEVEL } from '../game/classes';
 import { effectiveStats, ITEMS } from '../game/equipment';
-import { SKILLS, canUseSkill, describeSkillEffect, novaBlastCoords, skillTargets, type SkillDef } from '../game/skills';
+import {
+  HEAL_BONUS,
+  NOVA_DAMAGE_MULTIPLIER,
+  SKILLS,
+  SNIPE_BONUS,
+  canUseSkill,
+  describeSkillEffect,
+  novaBlastCoords,
+  novaBlastTargets,
+  skillTargets,
+  type SkillDef,
+} from '../game/skills';
 import type { ItemSlot } from '../game/types';
 import type { GameOver } from '../game/game';
 import pkg from '../../package.json';
@@ -55,18 +66,28 @@ const TERRAIN_SPRITE_INDEX: Record<TerrainType, number> = {
 type Mode = 'move' | 'menu' | 'targeting' | 'confirm' | 'animating' | 'skill-targeting' | 'skill-confirm';
 
 /**
- * Client-side-only playback state for a confirmed attack. The real
- * attackUnit move doesn't fire until this finishes, so hpOverride is how the
- * board shows HP draining before G actually changes.
+ * Client-side-only playback state for a confirmed attack or skill, keyed by
+ * unit id. The real move doesn't fire until this finishes, so it's how the
+ * board shows HP draining (or rising, for a heal) before G actually
+ * changes. A plain map rather than a fixed attacker/target shape so a
+ * single beat can update several units at once (Nova hits up to 5 tiles).
  */
-interface CombatAnim {
-  attackerId: string;
-  targetId: string;
-  attackerHp: number;
-  targetHp: number;
-  shakingId: string | null;
-  /** `kind` picks the color: red for damage, green for a future heal source. */
-  floatingNumber: { unitId: string; value: number; kind: 'damage' | 'heal' } | null;
+type CombatAnim = Record<
+  string,
+  {
+    hp: number;
+    shaking: boolean;
+    /** `kind` picks the color: red for damage, green for a heal. */
+    floatingNumber: { value: number; kind: 'damage' | 'heal' } | null;
+  }
+>;
+
+/** One unit's HP update within a single simultaneous beat. */
+interface BeatHit {
+  unitId: string;
+  hp: number;
+  shake?: boolean;
+  floatingNumber?: { value: number; kind: 'damage' | 'heal' };
 }
 
 export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
@@ -106,9 +127,44 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
         events.endTurn?.();
         return;
       }
-      if (action.type === 'move') moves.moveUnit(action.unitId, action.x, action.y);
-      else if (action.type === 'attack') moves.attackUnit(action.attackerId, action.targetId);
-      else moves.waitUnit(action.unitId);
+
+      if (action.type === 'move') {
+        moves.moveUnit(action.unitId, action.x, action.y);
+        return;
+      }
+
+      if (action.type === 'wait') {
+        moves.waitUnit(action.unitId);
+        return;
+      }
+
+      // Attack: animate the same beats a player attack would, so enemy
+      // hits are just as readable — a floating number and an HP-bar drain
+      // instead of the old instant resolution.
+      const attacker = G.units[action.attackerId];
+      const target = G.units[action.targetId];
+      if (!attacker || !target) return;
+
+      const forecast = forecastCombat(G, attacker, target);
+      const hasCounter = forecast.counterDamage !== null && !forecast.willKill;
+
+      const beats: BeatHit[][] = [
+        [{ unitId: target.id, hp: forecast.defenderHpAfter, shake: true, floatingNumber: { value: forecast.damageDealt, kind: 'damage' } }],
+      ];
+      if (hasCounter) {
+        beats.push([
+          {
+            unitId: attacker.id,
+            hp: forecast.attackerHpAfter,
+            shake: true,
+            floatingNumber: { value: forecast.counterDamage as number, kind: 'damage' },
+          },
+        ]);
+      }
+
+      playBeats({ [attacker.id]: attacker.hp, [target.id]: target.hp }, beats, () => {
+        moves.attackUnit(action.attackerId, action.targetId);
+      });
     }, ENEMY_ACTION_DELAY);
 
     return () => clearTimeout(timer);
@@ -264,15 +320,173 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   }
 
   /**
-   * Skills resolve instantly rather than playing out in animated beats the
-   * way a confirmed attack does — there's no single shared shape across
-   * heal/refresh/double-strike/blast to animate uniformly, and the HP bars
-   * still transition smoothly on their own via CSS.
+   * Plays a sequence of simultaneous HP-update beats, seeded from each
+   * involved unit's current live HP, then hands control back once the last
+   * beat's hold time has elapsed. Shared by player attacks, player skills,
+   * and CPU attacks so all three animate the same way — a single beat can
+   * update several units at once (Nova hits up to 5 tiles in one beat).
    */
+  function playBeats(startingHp: Record<string, number>, beats: BeatHit[][], onComplete: () => void) {
+    const initial: CombatAnim = {};
+    for (const [unitId, hp] of Object.entries(startingHp)) {
+      initial[unitId] = { hp, shaking: false, floatingNumber: null };
+    }
+    setCombatAnim(initial);
+
+    beats.forEach((beat, i) => {
+      window.setTimeout(
+        () => {
+          setCombatAnim((prev) => {
+            if (!prev) return prev;
+            const next = { ...prev };
+            for (const hit of beat) {
+              next[hit.unitId] = {
+                hp: hit.hp,
+                shaking: hit.shake ?? false,
+                floatingNumber: hit.floatingNumber ?? null,
+              };
+            }
+            return next;
+          });
+        },
+        20 + i * COMBAT_BEAT_MS,
+      );
+    });
+
+    window.setTimeout(
+      () => {
+        setCombatAnim(null);
+        onComplete();
+      },
+      20 + beats.length * COMBAT_BEAT_MS,
+    );
+  }
+
+  /**
+   * Predicts the HP-update beats a confirmed skill will produce, using the
+   * exact same formulas (HEAL_BONUS, SNIPE_BONUS, NOVA_DAMAGE_MULTIPLIER,
+   * computeDamage, canCounter) the real useSkill move applies — combat is
+   * deterministic and nothing else can act in between, so this preview can
+   * never drift from what the move actually does. Returns null for Dance:
+   * it changes no HP, so there's nothing to animate.
+   */
+  function computeSkillBeats(
+    unit: Unit,
+    target: Unit | undefined,
+  ): { startingHp: Record<string, number>; beats: BeatHit[][] } | null {
+    const skill = SKILLS[unit.className];
+
+    switch (skill.id) {
+      case 'heal': {
+        if (!target) return null;
+        const amount = Math.min(target.maxHp - target.hp, unit.atk + HEAL_BONUS);
+        return {
+          startingHp: { [target.id]: target.hp },
+          beats: [[{ unitId: target.id, hp: target.hp + amount, floatingNumber: { value: amount, kind: 'heal' } }]],
+        };
+      }
+
+      case 'dance':
+        return null;
+
+      case 'sword-dance': {
+        if (!target) return null;
+        const dmg1 = computeDamage(G, unit, target);
+        const hpAfter1 = Math.max(0, target.hp - dmg1);
+        const beats: BeatHit[][] = [
+          [{ unitId: target.id, hp: hpAfter1, shake: true, floatingNumber: { value: dmg1, kind: 'damage' } }],
+        ];
+        if (hpAfter1 > 0) {
+          const dmg2 = computeDamage(G, unit, { ...target, hp: hpAfter1 });
+          const hpAfter2 = Math.max(0, hpAfter1 - dmg2);
+          beats.push([{ unitId: target.id, hp: hpAfter2, shake: true, floatingNumber: { value: dmg2, kind: 'damage' } }]);
+          if (hpAfter2 > 0 && canCounter(unit, target)) {
+            const counterDmg = computeDamage(G, target, unit);
+            beats.push([
+              { unitId: unit.id, hp: Math.max(0, unit.hp - counterDmg), shake: true, floatingNumber: { value: counterDmg, kind: 'damage' } },
+            ]);
+          }
+        }
+        return { startingHp: { [unit.id]: unit.hp, [target.id]: target.hp }, beats };
+      }
+
+      case 'guard-break': {
+        if (!target) return null;
+        const dmg = Math.max(1, effectiveStats(unit).atk - effectiveStats(target).def);
+        const hpAfter = Math.max(0, target.hp - dmg);
+        const beats: BeatHit[][] = [
+          [{ unitId: target.id, hp: hpAfter, shake: true, floatingNumber: { value: dmg, kind: 'damage' } }],
+        ];
+        if (hpAfter > 0 && canCounter(unit, target)) {
+          const counterDmg = computeDamage(G, target, unit);
+          beats.push([
+            { unitId: unit.id, hp: Math.max(0, unit.hp - counterDmg), shake: true, floatingNumber: { value: counterDmg, kind: 'damage' } },
+          ]);
+        }
+        return { startingHp: { [unit.id]: unit.hp, [target.id]: target.hp }, beats };
+      }
+
+      case 'snipe': {
+        if (!target) return null;
+        const dmg = computeDamage(G, unit, target) + SNIPE_BONUS;
+        return {
+          startingHp: { [target.id]: target.hp },
+          beats: [[{ unitId: target.id, hp: Math.max(0, target.hp - dmg), shake: true, floatingNumber: { value: dmg, kind: 'damage' } }]],
+        };
+      }
+
+      case 'nova': {
+        if (!target) return null;
+        const hits = novaBlastTargets(G, unit, target);
+        if (hits.length === 0) return null;
+        const startingHp: Record<string, number> = {};
+        const beat: BeatHit[] = hits.map((hitTarget) => {
+          startingHp[hitTarget.id] = hitTarget.hp;
+          const dmg = Math.max(1, Math.round(computeDamage(G, unit, hitTarget) * NOVA_DAMAGE_MULTIPLIER));
+          return { unitId: hitTarget.id, hp: Math.max(0, hitTarget.hp - dmg), shake: true, floatingNumber: { value: dmg, kind: 'damage' } };
+        });
+        return { startingHp, beats: [beat] };
+      }
+
+      case 'rampage': {
+        if (!target) return null;
+        const dmg = computeDamage(G, unit, target);
+        const hpAfter = Math.max(0, target.hp - dmg);
+        const beats: BeatHit[][] = [
+          [{ unitId: target.id, hp: hpAfter, shake: true, floatingNumber: { value: dmg, kind: 'damage' } }],
+        ];
+        if (hpAfter > 0 && canCounter(unit, target)) {
+          const counterDmg = computeDamage(G, target, unit);
+          beats.push([
+            { unitId: unit.id, hp: Math.max(0, unit.hp - counterDmg), shake: true, floatingNumber: { value: counterDmg, kind: 'damage' } },
+          ]);
+        }
+        return { startingHp: { [unit.id]: unit.hp, [target.id]: target.hp }, beats };
+      }
+
+      default:
+        return null;
+    }
+  }
+
   function handleConfirmSkill() {
     if (!selected || !pendingTargetId) return;
-    moves.useSkill(selected.id, pendingTargetId);
-    clearSelection();
+    const unitId = selected.id;
+    const targetId = pendingTargetId;
+    const target = G.units[targetId];
+    const predicted = computeSkillBeats(selected, target);
+
+    if (!predicted) {
+      moves.useSkill(unitId, targetId);
+      clearSelection();
+      return;
+    }
+
+    setMode('animating');
+    playBeats(predicted.startingHp, predicted.beats, () => {
+      moves.useSkill(unitId, targetId);
+      clearSelection();
+    });
   }
 
   /**
@@ -289,59 +503,25 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     const targetId = pendingTargetId;
     const hasCounter = forecast.counterDamage !== null && !forecast.willKill;
 
-    setMode('animating');
-    setCombatAnim({
-      attackerId,
-      targetId,
-      attackerHp: selected.hp,
-      targetHp: previewTarget.hp,
-      shakingId: null,
-      floatingNumber: null,
-    });
-
-    // Beat 1, next tick so the pre-hit frame actually paints first: the hit lands.
-    window.setTimeout(() => {
-      setCombatAnim((prev) =>
-        prev
-          ? {
-              ...prev,
-              targetHp: forecast.defenderHpAfter,
-              shakingId: targetId,
-              floatingNumber: { unitId: targetId, value: forecast.damageDealt, kind: 'damage' },
-            }
-          : prev,
-      );
-    }, 20);
-
-    // Beat 2, only if the target survives and can strike back: the counter lands.
+    const beats: BeatHit[][] = [
+      [{ unitId: targetId, hp: forecast.defenderHpAfter, shake: true, floatingNumber: { value: forecast.damageDealt, kind: 'damage' } }],
+    ];
     if (hasCounter) {
-      window.setTimeout(() => {
-        setCombatAnim((prev) =>
-          prev
-            ? {
-                ...prev,
-                attackerHp: forecast.attackerHpAfter,
-                shakingId: attackerId,
-                floatingNumber: {
-                  unitId: attackerId,
-                  value: forecast.counterDamage as number,
-                  kind: 'damage',
-                },
-              }
-            : prev,
-        );
-      }, COMBAT_BEAT_MS);
+      beats.push([
+        {
+          unitId: attackerId,
+          hp: forecast.attackerHpAfter,
+          shake: true,
+          floatingNumber: { value: forecast.counterDamage as number, kind: 'damage' },
+        },
+      ]);
     }
 
-    // Resolve: commit the real move, then hand control back.
-    window.setTimeout(
-      () => {
-        moves.attackUnit(attackerId, targetId);
-        setCombatAnim(null);
-        clearSelection();
-      },
-      hasCounter ? COMBAT_BEAT_MS * 2 : COMBAT_BEAT_MS,
-    );
+    setMode('animating');
+    playBeats({ [attackerId]: selected.hp, [targetId]: previewTarget.hp }, beats, () => {
+      moves.attackUnit(attackerId, targetId);
+      clearSelection();
+    });
   }
 
   const gameover = ctx.gameover as GameOver | undefined;
@@ -477,16 +657,10 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 tile-button remount that would otherwise cause an instant jump. */}
             <div className="we-unit-layer">
               {Object.values(G.units).map((unit) => {
-                const isAnimAttacker = combatAnim?.attackerId === unit.id;
-                const isAnimTarget = combatAnim?.targetId === unit.id;
-                const hpOverride = isAnimAttacker
-                  ? combatAnim.attackerHp
-                  : isAnimTarget
-                    ? combatAnim.targetHp
-                    : undefined;
-                const shaking = combatAnim?.shakingId === unit.id;
-                const floatingNumber =
-                  combatAnim?.floatingNumber?.unitId === unit.id ? combatAnim.floatingNumber : null;
+                const anim = combatAnim?.[unit.id];
+                const hpOverride = anim?.hp;
+                const shaking = anim?.shaking ?? false;
+                const floatingNumber = anim?.floatingNumber ?? null;
 
                 return (
                   <div
