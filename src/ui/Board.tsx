@@ -45,6 +45,11 @@ const ENEMY_ACTION_DELAY = 550;
 /** How long each beat of a player attack's animation holds before the next. */
 const COMBAT_BEAT_MS = 500;
 
+/** How far a striker leans toward whoever it's hitting, before easing back. */
+const LUNGE_HOLD_MS = 180;
+/** Fraction of a tile the striker steps toward its target — a nudge, not a lunge onto the tile. */
+const LUNGE_FRACTION = 0.22;
+
 const EMPTY_REACHABLE = new Map<string, ReachableTile>();
 
 /**
@@ -106,6 +111,8 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [inventoryUnitId, setInventoryUnitId] = useState<string | null>(null);
   const [waveBanner, setWaveBanner] = useState<number | null>(null);
+  /** The unit currently leaning toward whoever it's striking this beat, and how far. */
+  const [lunge, setLunge] = useState<{ unitId: string; dx: number; dy: number } | null>(null);
   const particlesRef = useRef<ParticleBurstHandle | null>(null);
   const boardRef = useRef<HTMLDivElement | null>(null);
   const { exitToMenu, retry } = useMenuActions();
@@ -181,9 +188,14 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
         ]);
       }
 
-      playBeats({ [attacker.id]: attacker.hp, [target.id]: target.hp }, beats, () => {
-        moves.attackUnit(action.attackerId, action.targetId);
-      });
+      playBeats(
+        { [attacker.id]: attacker.hp, [target.id]: target.hp },
+        beats,
+        () => {
+          moves.attackUnit(action.attackerId, action.targetId);
+        },
+        { attackerId: attacker.id, targetId: target.id },
+      );
     }, ENEMY_ACTION_DELAY);
 
     return () => clearTimeout(timer);
@@ -362,18 +374,55 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   }
 
   /**
+   * Leans `strikerId` toward the centroid of `hitUnitIds`, then eases back a
+   * beat later. A direction-only nudge (-1/0/1 per axis) rather than a
+   * fraction of the distance, so a ranged unit (bow, staff) takes the same
+   * small step forward as someone landing a melee hit next door, instead of
+   * lunging halfway across the board.
+   */
+  function triggerLunge(strikerId: string, hitUnitIds: string[]) {
+    const striker = G.units[strikerId];
+    const hitUnits = hitUnitIds.map((id) => G.units[id]).filter((u): u is Unit => !!u);
+    if (!striker || hitUnits.length === 0) return;
+
+    const avgX = hitUnits.reduce((sum, u) => sum + u.x, 0) / hitUnits.length;
+    const avgY = hitUnits.reduce((sum, u) => sum + u.y, 0) / hitUnits.length;
+    const dx = Math.sign(avgX - striker.x);
+    const dy = Math.sign(avgY - striker.y);
+    if (dx === 0 && dy === 0) return;
+
+    setLunge({ unitId: strikerId, dx, dy });
+    window.setTimeout(() => {
+      setLunge((prev) => (prev?.unitId === strikerId ? null : prev));
+    }, LUNGE_HOLD_MS);
+  }
+
+  /**
    * Plays a sequence of simultaneous HP-update beats, seeded from each
    * involved unit's current live HP, then hands control back once the last
    * beat's hold time has elapsed. Shared by player attacks, player skills,
    * and CPU attacks so all three animate the same way — a single beat can
    * update several units at once (Nova hits up to 5 tiles in one beat).
+   *
+   * `participants` names the two units the beats are between (attacker and
+   * target for a plain attack; caster and target for a skill). Whichever one
+   * *isn't* being hit in a given beat is the striker for that beat — this
+   * flips correctly for a counterattack beat, where the original target
+   * becomes the striker hitting the original attacker back.
    */
-  function playBeats(startingHp: Record<string, number>, beats: BeatHit[][], onComplete: () => void) {
+  function playBeats(
+    startingHp: Record<string, number>,
+    beats: BeatHit[][],
+    onComplete: () => void,
+    participants?: { attackerId: string; targetId: string },
+    burstVariant: 'normal' | 'skill' = 'normal',
+  ) {
     const initial: CombatAnim = {};
     for (const [unitId, hp] of Object.entries(startingHp)) {
       initial[unitId] = { hp, shaking: false, floatingNumber: null };
     }
     setCombatAnim(initial);
+    setLunge(null);
 
     beats.forEach((beat, i) => {
       window.setTimeout(
@@ -398,12 +447,21 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
             const target = G.units[hit.unitId];
             if (!target) continue;
             if (hit.floatingNumber?.kind === 'heal') {
-              particlesRef.current?.burst(target.x, target.y, 'heal');
+              particlesRef.current?.burst(target.x, target.y, 'heal', burstVariant);
             } else if (hit.shake) {
-              particlesRef.current?.burst(target.x, target.y, 'damage');
+              particlesRef.current?.burst(target.x, target.y, 'damage', burstVariant);
             }
           }
           if (beat.some((hit) => hit.shake)) shakeBoard();
+
+          if (participants) {
+            const hitIds = beat.map((hit) => hit.unitId);
+            const hitSet = new Set(hitIds);
+            const targetIsHit = hitSet.has(participants.targetId);
+            const attackerIsHit = hitSet.has(participants.attackerId);
+            const striker = targetIsHit && !attackerIsHit ? participants.attackerId : !targetIsHit && attackerIsHit ? participants.targetId : null;
+            if (striker) triggerLunge(striker, hitIds);
+          }
         },
         20 + i * COMBAT_BEAT_MS,
       );
@@ -538,10 +596,16 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     }
 
     setMode('animating');
-    playBeats(predicted.startingHp, predicted.beats, () => {
-      moves.useSkill(unitId, targetId);
-      clearSelection();
-    });
+    playBeats(
+      predicted.startingHp,
+      predicted.beats,
+      () => {
+        moves.useSkill(unitId, targetId);
+        clearSelection();
+      },
+      { attackerId: unitId, targetId },
+      'skill',
+    );
   }
 
   /**
@@ -573,10 +637,15 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     }
 
     setMode('animating');
-    playBeats({ [attackerId]: selected.hp, [targetId]: previewTarget.hp }, beats, () => {
-      moves.attackUnit(attackerId, targetId);
-      clearSelection();
-    });
+    playBeats(
+      { [attackerId]: selected.hp, [targetId]: previewTarget.hp },
+      beats,
+      () => {
+        moves.attackUnit(attackerId, targetId);
+        clearSelection();
+      },
+      { attackerId, targetId },
+    );
   }
 
   const gameover = ctx.gameover as GameOver | undefined;
@@ -751,13 +820,19 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 const hpOverride = anim?.hp;
                 const shaking = anim?.shaking ?? false;
                 const floatingNumber = anim?.floatingNumber ?? null;
+                // A brief step toward whoever this unit is currently striking,
+                // so an attack reads as a lunge instead of two HP bars moving
+                // while both sprites stand still. Direction-only, not fraction
+                // of distance — see LUNGE_FRACTION.
+                const lungeDx = lunge?.unitId === unit.id ? lunge.dx : 0;
+                const lungeDy = lunge?.unitId === unit.id ? lunge.dy : 0;
 
                 return (
                   <div
                     key={unit.id}
                     className="we-unit-slot"
                     style={{
-                      transform: `translate(calc((var(--tile) + var(--tile-gap)) * ${unit.x}), calc((var(--tile) + var(--tile-gap)) * ${unit.y}))`,
+                      transform: `translate(calc((var(--tile) + var(--tile-gap)) * ${unit.x} + var(--tile) * ${lungeDx * LUNGE_FRACTION}), calc((var(--tile) + var(--tile-gap)) * ${unit.y} + var(--tile) * ${lungeDy * LUNGE_FRACTION}))`,
                     }}
                   >
                     <UnitToken

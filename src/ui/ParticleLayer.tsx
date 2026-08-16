@@ -9,10 +9,12 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 
  */
 
 export type BurstKind = 'damage' | 'heal';
+/** 'skill' is a bigger, showier version for active skills — plain attacks stay understated. */
+export type BurstVariant = 'normal' | 'skill';
 
 export interface ParticleBurstHandle {
   /** Spawns a burst centred on a board cell, in grid (not pixel) coordinates. */
-  burst(gridX: number, gridY: number, kind: BurstKind): void;
+  burst(gridX: number, gridY: number, kind: BurstKind, variant?: BurstVariant): void;
 }
 
 interface Particle {
@@ -26,14 +28,24 @@ interface Particle {
   maxLife: number;
   size: number;
   color: string;
+  /** Ring shards ignore gravity so the ring stays a clean circle as it expands. */
+  gravity: boolean;
 }
 
 const PALETTE: Record<BurstKind, string[]> = {
   damage: ['#ffd479', '#f0616d', '#ffffff'],
   heal: ['#4ad991', '#a7f3d0', '#ffffff'],
 };
+/** Extra accent colors mixed into a skill burst's scatter, on top of PALETTE. */
+const SKILL_ACCENT: Record<BurstKind, string> = {
+  damage: '#c792ea',
+  heal: '#ffe9a8',
+};
 
 const PARTICLES_PER_BURST = 14;
+const SKILL_SCATTER_PARTICLES = 22;
+/** Evenly spaced shards forming the expanding ring — a skill-only flourish. */
+const SKILL_RING_PARTICLES = 14;
 /** px/s² — enough that shards arc and fall rather than drifting flatly outward. */
 const GRAVITY = 260;
 
@@ -92,7 +104,7 @@ export const ParticleLayer = forwardRef<ParticleBurstHandle, { cols: number }>(f
       particle.life -= dt;
       if (particle.life <= 0) continue;
 
-      particle.vy += GRAVITY * dt;
+      if (particle.gravity) particle.vy += GRAVITY * dt;
       particle.x += particle.vx * dt;
       particle.y += particle.vy * dt;
 
@@ -117,7 +129,7 @@ export const ParticleLayer = forwardRef<ParticleBurstHandle, { cols: number }>(f
   useImperativeHandle(
     ref,
     () => ({
-      burst(gridX, gridY, kind) {
+      burst(gridX, gridY, kind, variant = 'normal') {
         const canvas = canvasRef.current;
         if (!canvas) return;
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -133,8 +145,10 @@ export const ParticleLayer = forwardRef<ParticleBurstHandle, { cols: number }>(f
         const centreX = (tile + gap) * gridX + tile / 2;
         const centreY = (tile + gap) * gridY + tile / 2;
 
-        const colors = PALETTE[kind];
-        for (let i = 0; i < PARTICLES_PER_BURST; i += 1) {
+        const colors = variant === 'skill' ? [...PALETTE[kind], SKILL_ACCENT[kind]] : PALETTE[kind];
+        const scatterCount = variant === 'skill' ? SKILL_SCATTER_PARTICLES : PARTICLES_PER_BURST;
+
+        for (let i = 0; i < scatterCount; i += 1) {
           const angle = Math.random() * Math.PI * 2;
           const speed = 50 + Math.random() * 110;
           const maxLife = 0.34 + Math.random() * 0.2;
@@ -148,7 +162,30 @@ export const ParticleLayer = forwardRef<ParticleBurstHandle, { cols: number }>(f
             maxLife,
             size: 3 + Math.random() * 2,
             color: colors[Math.floor(Math.random() * colors.length)],
+            gravity: true,
           });
+        }
+
+        // The skill flourish: a clean ring of shards launched at even angles
+        // and immune to gravity, so it reads as a brief magic-circle pulse
+        // radiating outward rather than more scatter falling into the pile.
+        if (variant === 'skill') {
+          for (let i = 0; i < SKILL_RING_PARTICLES; i += 1) {
+            const angle = (i / SKILL_RING_PARTICLES) * Math.PI * 2;
+            const speed = 150 + Math.random() * 30;
+            const maxLife = 0.3 + Math.random() * 0.08;
+            particlesRef.current.push({
+              x: centreX,
+              y: centreY,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              life: maxLife,
+              maxLife,
+              size: 2.5,
+              color: SKILL_ACCENT[kind],
+              gravity: false,
+            });
+          }
         }
 
         if (frameRef.current === null) {
