@@ -16,7 +16,7 @@ export function TitleScreen({
   onOpenCampaign: () => void;
 }) {
   return (
-    <div className="we-title">
+    <div className="we-title we-title--top">
       <div className="we-title__inner">
         <h1 className="we-title__name we-title__name--brand">
           BIBI&rsquo;s <span>WinterEmblem</span>
