@@ -11,11 +11,9 @@ const GAME_VERSION = pkg.version;
 export function TitleScreen({
   onPlayRoguelike,
   onOpenCampaign,
-  onOpenPhaserDemo,
 }: {
   onPlayRoguelike: () => void;
   onOpenCampaign: () => void;
-  onOpenPhaserDemo: () => void;
 }) {
   return (
     <div className="we-title">
@@ -45,10 +43,6 @@ export function TitleScreen({
             <span className="we-mode-card__meta">One life, no continues</span>
           </button>
         </div>
-
-        <button type="button" className="we-title__experiment" onClick={onOpenPhaserDemo}>
-          Phaser VFX prototype
-        </button>
 
         <p className="we-title__version">v{GAME_VERSION}</p>
       </div>

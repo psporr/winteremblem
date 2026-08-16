@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { BoardProps } from 'boardgame.io/react';
 
 import type { GameState, TerrainType, Unit } from '../game/types';
 import { PLAYER_ID } from '../game/types';
 import terrainTileset from '../assets/terrain/toen-terrain.png';
 import { UNIT_SPRITES, SPRITE_DISPLAY_HEIGHT } from './unitSprites';
+import { ParticleLayer, type ParticleBurstHandle } from './ParticleLayer';
 import {
   computeReachable,
   computeThreatTiles,
@@ -105,6 +106,8 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [inventoryUnitId, setInventoryUnitId] = useState<string | null>(null);
   const [waveBanner, setWaveBanner] = useState<number | null>(null);
+  const particlesRef = useRef<ParticleBurstHandle | null>(null);
+  const boardRef = useRef<HTMLDivElement | null>(null);
   const { exitToMenu, retry } = useMenuActions();
 
   const isPlayerPhase =
@@ -345,6 +348,20 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   }
 
   /**
+   * Restarts the impact shake. The class has to come off and the element be
+   * reflowed before it goes back on, or a second hit within the same combat
+   * wouldn't replay the animation. Safe to drive imperatively: .we-board's
+   * React-owned className is a constant, so React never rewrites it here.
+   */
+  function shakeBoard() {
+    const board = boardRef.current;
+    if (!board) return;
+    board.classList.remove('we-board--shake');
+    void board.offsetWidth;
+    board.classList.add('we-board--shake');
+  }
+
+  /**
    * Plays a sequence of simultaneous HP-update beats, seeded from each
    * involved unit's current live HP, then hands control back once the last
    * beat's hold time has elapsed. Shared by player attacks, player skills,
@@ -373,6 +390,20 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
             }
             return next;
           });
+
+          // Positions are read from G rather than carried on the beat: no unit
+          // moves once a beat sequence has started, so G is accurate here even
+          // though the underlying move hasn't been dispatched yet.
+          for (const hit of beat) {
+            const target = G.units[hit.unitId];
+            if (!target) continue;
+            if (hit.floatingNumber?.kind === 'heal') {
+              particlesRef.current?.burst(target.x, target.y, 'heal');
+            } else if (hit.shake) {
+              particlesRef.current?.burst(target.x, target.y, 'damage');
+            }
+          }
+          if (beat.some((hit) => hit.shake)) shakeBoard();
         },
         20 + i * COMBAT_BEAT_MS,
       );
@@ -646,7 +677,14 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
       <div className="we-layout">
         <div className="we-board-wrap">
           <div
+            ref={boardRef}
             className="we-board"
+            onAnimationEnd={(event) => {
+              // Clear the shake so the class never lingers between hits.
+              if (event.animationName.includes('we-board-shake')) {
+                boardRef.current?.classList.remove('we-board--shake');
+              }
+            }}
             style={
               {
                 gridTemplateColumns: `repeat(${G.width}, var(--tile))`,
@@ -701,6 +739,8 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 );
               }),
             )}
+
+            <ParticleLayer ref={particlesRef} cols={G.width} />
 
             {/* Positioned separately from the tile grid, keyed by unit id, so
                 moving a unit slides its token to the new cell instead of the

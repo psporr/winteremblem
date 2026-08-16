@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Client } from 'boardgame.io/react';
 
 import { createWinterEmblem } from './game/game';
@@ -8,21 +8,9 @@ import { Board } from './ui/Board';
 import { ChapterSelect, TitleScreen } from './ui/TitleScreen';
 import { MenuActionsContext, type MenuActions } from './ui/menuContext';
 
-/**
- * Phaser is ~1.4 MB — far bigger than the entire rest of the game — and the
- * prototype that uses it isn't part of normal play. Loading it lazily keeps
- * it out of the main bundle entirely: players who never open the demo never
- * download the engine.
- */
-const PhaserPrototype = lazy(() =>
-  import('./ui/PhaserPrototype').then((module) => ({ default: module.PhaserPrototype })),
-);
-
 type Screen =
   | { kind: 'title' }
   | { kind: 'chapter-select' }
-  /** Throwaway render-layer experiment; not part of the game proper. */
-  | { kind: 'phaser-demo' }
   /** `runId` changes on retry, remounting the client for a fresh battle. */
   | { kind: 'game'; mode: GameMode; chapterId: string; runId: number };
 
@@ -68,24 +56,7 @@ export default function App() {
       <TitleScreen
         onPlayRoguelike={() => setScreen({ kind: 'game', mode: 'roguelike', chapterId: CHAPTER_1.id, runId: 0 })}
         onOpenCampaign={() => setScreen({ kind: 'chapter-select' })}
-        onOpenPhaserDemo={() => setScreen({ kind: 'phaser-demo' })}
       />
-    );
-  }
-
-  if (screen.kind === 'phaser-demo') {
-    // The fallback is styled inline rather than via a class: the prototype's
-    // stylesheet ships inside the lazy chunk, so it hasn't loaded yet here.
-    return (
-      <Suspense
-        fallback={
-          <div style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', color: '#9fb3d1' }}>
-            Loading Phaser…
-          </div>
-        }
-      >
-        <PhaserPrototype onBack={exitToMenu} />
-      </Suspense>
     );
   }
 

@@ -140,6 +140,53 @@ body {
   position: relative;
 }
 
+/* Impact particles. Sits above the tiles but below .we-unit (z-index 1), so
+   a burst reads as shards flying out from behind the sprite and never
+   occludes the unit or its floating damage number. Shares the unit layer's
+   geometry exactly, so grid coordinates map the same way in both. */
+.we-particles {
+  position: absolute;
+  inset: var(--board-pad);
+  pointer-events: none;
+}
+
+.we-particles__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* A short, sharp knock on impact. Deliberately small — a few pixels is
+   enough to sell the hit without making text unreadable mid-combat. */
+@keyframes we-board-shake {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  20% {
+    transform: translate(-3px, 2px);
+  }
+  40% {
+    transform: translate(3px, -2px);
+  }
+  60% {
+    transform: translate(-2px, -2px);
+  }
+  80% {
+    transform: translate(2px, 2px);
+  }
+}
+
+.we-board--shake {
+  animation: we-board-shake 180ms ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .we-board--shake {
+    animation: none;
+  }
+}
+
 /* Absolutely positioned, so it's excluded from the tile grid's own
    auto-placement despite being a direct child of a grid container. */
 .we-unit-layer {
