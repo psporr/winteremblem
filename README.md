@@ -43,8 +43,12 @@ Command flow follows classic Fire Emblem, tuned for touch:
   their post-combat values, attack/counter damage — before **Confirm** commits
   it. **Cancel** backs out to target selection.
 - **Tap a skill** to highlight its valid targets — red for an enemy skill,
-  green for an ally one (Heal, Dance) — then tap one for a preview card (e.g.
-  "Two hits for 10 each") before **Confirm**. Goes on a 3-turn cooldown after use.
+  green for an ally one (Heal, Dance) — then tap one for the same
+  portrait-matchup forecast card Attack uses (skill name on top, own HP
+  transition and stat on each side) before **Confirm**. Nova's card only
+  shows the tapped target even though the blast can hit several; Dance falls
+  back to a plain-text line since refreshing an ally changes no HP. Goes on
+  a 3-turn cooldown after use.
 - **Confirming an attack or a damage/heal skill plays it out in beats**, not
   instantly: each hit lands one at a time (floating number, HP bar drains or
   rises, a brief shake on damage) before the result actually applies — Sword

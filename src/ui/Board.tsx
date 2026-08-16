@@ -199,6 +199,15 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   );
   const canSkill = selected && isPlayerPhase ? canUseSkill(G, selected) : false;
 
+  // Predicted beats for whichever target is pending confirmation — drives
+  // both the confirm card's numbers and the actual animation once
+  // confirmed, so the two can never disagree.
+  const skillPredicted = useMemo(() => {
+    if (mode !== 'skill-confirm' || !selected || !pendingTargetId) return null;
+    return computeSkillBeats(selected, G.units[pendingTargetId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [G, mode, selected, pendingTargetId]);
+
   // Nova's plus-shaped blast around whichever target is currently pending
   // confirmation — previewed on the board so the player sees exactly which
   // tiles are about to get hit before committing.
@@ -473,8 +482,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     if (!selected || !pendingTargetId) return;
     const unitId = selected.id;
     const targetId = pendingTargetId;
-    const target = G.units[targetId];
-    const predicted = computeSkillBeats(selected, target);
+    const predicted = skillPredicted;
 
     if (!predicted) {
       moves.useSkill(unitId, targetId);
@@ -710,6 +718,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 unit={selected}
                 skill={skillDef}
                 target={pendingTargetId ? G.units[pendingTargetId] : undefined}
+                predicted={skillPredicted}
                 onConfirm={handleConfirmSkill}
                 onCancel={handleCancelSkillConfirm}
               />
@@ -1058,15 +1067,76 @@ function ForecastSide({
 }
 
 /**
- * Skills resolve instantly (no animated beats — see handleConfirmSkill), so
- * this card's only job is a plain-text preview of what confirming will do,
- * computed by the same formulas the real move applies.
+ * What a skill's confirm card needs to show per side — same shape as the
+ * plain-attack forecast (own HP transition + the stat that produced it), so
+ * skills and attacks can share ForecastSide instead of two visual styles.
+ */
+interface SkillForecastDisplay {
+  casterHpAfter: number;
+  casterStatLabel: string;
+  casterStatValue: number | null;
+  casterWillDie: boolean;
+  targetHpAfter: number;
+  targetStatLabel: string;
+  targetStatValue: number | null;
+  targetWillDie: boolean;
+}
+
+/**
+ * Derives the confirm card's numbers straight from the same predicted beats
+ * that will play the animation — not a fresh formula, so the card can never
+ * show a different number than what actually lands. For a multi-target
+ * skill (Nova), only the tapped target's beat entries are folded in; splash
+ * victims aren't shown here, matching the "just the main target" ask.
+ */
+function buildSkillForecast(
+  unit: Unit,
+  target: Unit,
+  predicted: { startingHp: Record<string, number>; beats: BeatHit[][] } | null,
+): SkillForecastDisplay | null {
+  if (!predicted) return null;
+  const isHeal = SKILLS[unit.className].id === 'heal';
+
+  let casterHp = unit.hp;
+  let targetHp = target.hp;
+  let dealt = 0;
+  let counter: number | null = null;
+
+  for (const beat of predicted.beats) {
+    for (const hit of beat) {
+      if (hit.unitId === target.id) {
+        targetHp = hit.hp;
+        if (hit.floatingNumber) dealt += hit.floatingNumber.value;
+      } else if (hit.unitId === unit.id) {
+        casterHp = hit.hp;
+        if (hit.floatingNumber) counter = hit.floatingNumber.value;
+      }
+    }
+  }
+
+  return {
+    casterHpAfter: casterHp,
+    casterStatLabel: isHeal ? 'Heal' : 'Atk',
+    casterStatValue: dealt,
+    casterWillDie: casterHp <= 0,
+    targetHpAfter: targetHp,
+    targetStatLabel: isHeal ? '' : counter !== null ? 'Counter' : 'No counter',
+    targetStatValue: isHeal ? null : counter,
+    targetWillDie: !isHeal && targetHp <= 0,
+  };
+}
+
+/**
+ * Same Fire Emblem-style matchup as a plain attack's ForecastCard — only
+ * Dance falls back to a plain-text line, since refreshing an ally changes
+ * no HP and there's nothing to put in a portrait matchup.
  */
 function SkillConfirmCard({
   G,
   unit,
   skill,
   target,
+  predicted,
   onConfirm,
   onCancel,
 }: {
@@ -1074,17 +1144,53 @@ function SkillConfirmCard({
   unit: Unit;
   skill: SkillDef;
   target: Unit | null | undefined;
+  predicted: { startingHp: Record<string, number>; beats: BeatHit[][] } | null;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  const preview = describeSkillEffect(G, unit, target ?? null);
+  const display = target ? buildSkillForecast(unit, target, predicted) : null;
+
+  const title = (
+    <div className="we-skill-card__title">
+      {unit.name}'s {skill.name}
+    </div>
+  );
+
+  if (!display || !target) {
+    return (
+      <div className="we-forecast-card we-skill-card">
+        {title}
+        <div className="we-skill-card__preview">{describeSkillEffect(G, unit, target ?? null)}</div>
+        <button type="button" className="we-menu__item we-menu__item--confirm" onClick={onConfirm}>
+          Confirm
+        </button>
+        <button type="button" className="we-menu__item we-menu__item--back" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="we-forecast-card we-skill-card">
-      <div className="we-skill-card__title">
-        {unit.name}'s {skill.name}
+    <div className="we-forecast-card">
+      {title}
+      <div className="we-forecast-card__matchup">
+        <ForecastSide
+          unit={unit}
+          hpAfter={display.casterHpAfter}
+          statLabel={display.casterStatLabel}
+          statValue={display.casterStatValue}
+        />
+        <span className="we-forecast-card__vs">VS</span>
+        <ForecastSide
+          unit={target}
+          hpAfter={display.targetHpAfter}
+          statLabel={display.targetStatLabel}
+          statValue={display.targetStatValue}
+        />
       </div>
-      <div className="we-skill-card__preview">{preview}</div>
+      {display.targetWillDie && <div className="we-menu__kill">Lethal</div>}
+      {display.casterWillDie && <div className="we-menu__danger">You would die</div>}
       <button type="button" className="we-menu__item we-menu__item--confirm" onClick={onConfirm}>
         Confirm
       </button>
