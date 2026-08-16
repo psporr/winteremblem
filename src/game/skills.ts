@@ -13,6 +13,13 @@ export const NOVA_DAMAGE_MULTIPLIER = 0.6;
 
 export type SkillTargetType = 'ally' | 'enemy';
 
+/**
+ * Drives the action menu's color-coding — not the same axis as targetType
+ * (both Heal and Dance target allies, but they're visually distinct: green
+ * for restoring HP, yellow for a non-damage utility effect).
+ */
+export type SkillCategory = 'attack' | 'heal' | 'utility';
+
 export interface SkillDef {
   id: string;
   name: string;
@@ -20,6 +27,7 @@ export interface SkillDef {
   /** Turns of cooldown after use, ticking down on the unit's own phases. */
   cooldown: number;
   targetType: SkillTargetType;
+  category: SkillCategory;
   /** Added on top of the unit's normal effective attack range, for this skill only. */
   rangeBonus: number;
 }
@@ -41,6 +49,7 @@ export const SKILLS: Record<ClassName, SkillDef> = {
     description: 'Restore HP to an ally in range.',
     cooldown: SKILL_COOLDOWN,
     targetType: 'ally',
+    category: 'heal',
     rangeBonus: 0,
   },
   Dancer: {
@@ -49,6 +58,7 @@ export const SKILLS: Record<ClassName, SkillDef> = {
     description: "Refresh an ally who's already acted, so they can move and act again.",
     cooldown: SKILL_COOLDOWN,
     targetType: 'ally',
+    category: 'utility',
     rangeBonus: 0,
   },
   Swordsman: {
@@ -57,6 +67,7 @@ export const SKILLS: Record<ClassName, SkillDef> = {
     description: 'Strike the same target twice in one action.',
     cooldown: SKILL_COOLDOWN,
     targetType: 'enemy',
+    category: 'attack',
     rangeBonus: 0,
   },
   Lancer: {
@@ -65,6 +76,7 @@ export const SKILLS: Record<ClassName, SkillDef> = {
     description: "Attack ignoring the target's terrain defense bonus.",
     cooldown: SKILL_COOLDOWN,
     targetType: 'enemy',
+    category: 'attack',
     rangeBonus: 0,
   },
   Archer: {
@@ -73,6 +85,7 @@ export const SKILLS: Record<ClassName, SkillDef> = {
     description: 'Bonus damage from +1 range; the target cannot counter.',
     cooldown: SKILL_COOLDOWN,
     targetType: 'enemy',
+    category: 'attack',
     rangeBonus: 1,
   },
   Mage: {
@@ -81,6 +94,7 @@ export const SKILLS: Record<ClassName, SkillDef> = {
     description: 'A plus-shaped blast centered on the target, for reduced damage each.',
     cooldown: SKILL_COOLDOWN,
     targetType: 'enemy',
+    category: 'attack',
     rangeBonus: 0,
   },
   Barbarian: {
@@ -89,6 +103,7 @@ export const SKILLS: Record<ClassName, SkillDef> = {
     description: 'A normal attack, but a kill lets the unit act again immediately.',
     cooldown: SKILL_COOLDOWN,
     targetType: 'enemy',
+    category: 'attack',
     rangeBonus: 0,
   },
 };

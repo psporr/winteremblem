@@ -30,6 +30,7 @@ import {
   novaBlastCoords,
   novaBlastTargets,
   skillTargets,
+  type SkillCategory,
   type SkillDef,
 } from '../game/skills';
 import type { ItemSlot } from '../game/types';
@@ -706,6 +707,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 boardHeight={G.height}
                 canAttack={attackTargets.length > 0}
                 skillLabel={canSkill && skillDef ? skillDef.name : null}
+                skillCategory={skillDef?.category ?? null}
                 onAttack={handleAttackPressed}
                 onSkill={handleSkillPressed}
                 onWait={handleWaitPressed}
@@ -817,6 +819,7 @@ function ActionPanel({
   boardHeight,
   canAttack,
   skillLabel,
+  skillCategory,
   onAttack,
   onSkill,
   onWait,
@@ -828,6 +831,8 @@ function ActionPanel({
   canAttack: boolean;
   /** The skill's own name (e.g. "Heal"), or null when it's not usable right now. */
   skillLabel: string | null;
+  /** Colors the skill button — attack skills read red, Heal green, Dance yellow. */
+  skillCategory: SkillCategory | null;
   onAttack: () => void;
   onSkill: () => void;
   onWait: () => void;
@@ -848,16 +853,16 @@ function ActionPanel({
     >
       <div className="we-menu">
         {canAttack && (
-          <button type="button" className="we-menu__item" onClick={onAttack}>
+          <button type="button" className="we-menu__item we-menu__item--attack" onClick={onAttack}>
             Attack
           </button>
         )}
         {skillLabel && (
-          <button type="button" className="we-menu__item" onClick={onSkill}>
+          <button type="button" className={`we-menu__item we-menu__item--${skillCategory}`} onClick={onSkill}>
             {skillLabel}
           </button>
         )}
-        <button type="button" className="we-menu__item" onClick={onWait}>
+        <button type="button" className="we-menu__item we-menu__item--wait" onClick={onWait}>
           Wait
         </button>
         <button type="button" className="we-menu__item we-menu__item--back" onClick={onBack}>

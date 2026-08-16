@@ -670,6 +670,30 @@ body {
   text-align: center;
 }
 
+/* Color-codes each action by what it does: red for anything that deals
+   damage (Attack and the 5 offensive skills), green for healing, yellow for
+   a non-damage utility effect (Dance), grey for ending the turn without
+   acting. Back stays neutral below — it's "undo," not an action category. */
+.we-menu__item--attack {
+  background: var(--danger);
+  color: #2a0a0d;
+}
+
+.we-menu__item--heal {
+  background: #4ad991;
+  color: #06281a;
+}
+
+.we-menu__item--utility {
+  background: #ffd479;
+  color: #3a2a06;
+}
+
+.we-menu__item--wait {
+  background: #8b95a5;
+  color: #1a1f27;
+}
+
 .we-menu__item--back {
   background: transparent;
   border-color: var(--panel-edge);
