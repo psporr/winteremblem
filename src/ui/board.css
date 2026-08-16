@@ -594,6 +594,22 @@ body {
   cursor: pointer;
 }
 
+.we-button--ghost {
+  background: transparent;
+  border-color: var(--panel-edge);
+  color: var(--ink-dim);
+}
+
+.we-button--ghost:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
+.we-overlay__actions {
+  display: flex;
+  gap: 8px;
+}
+
 /* Anchored to the selected unit's tile; the actual card offsets to whichever
    side keeps it on the board, flipping near the edge. */
 .we-panel-anchor {

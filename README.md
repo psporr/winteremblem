@@ -2,10 +2,16 @@
 
 A turn-based tactics RPG in the Fire Emblem mould, built for the browser.
 
-**Current milestone: v1 — single-player wave-survival vs CPU.** Clear a wave of
-enemies, pick a blessing, and face a tougher wave — repeat until your squad
-falls. Multiplayer co-op is the next milestone; the rules layer is already
-structured to make that a transport swap rather than a rewrite.
+**Two single-player modes, picked from the title screen:**
+
+- **Roguelike** — endless wave-survival on one map. Clear a wave, pick a
+  blessing, face a tougher wave, repeat until the squad falls.
+- **Campaign** — hand-authored chapters, each with its own map, fixed enemy
+  composition, and win condition. Chapter 1 (*The Iron Gate*) is a rout:
+  defeat every enemy to clear it.
+
+Both modes run on the same rules layer — they differ only in which chapter
+loads and what counts as clearing it, not in how anything actually plays.
 
 ## Running it
 
@@ -110,7 +116,7 @@ src/game/     rules layer — no React, no rendering
   classes.ts     per-class base stats, the level/stat growth curve, EXP constants
   equipment.ts   item catalog, effective-stats calculation, drop rolls
   skills.ts      per-class active skill definitions, targeting, effect previews
-  maps.ts        ASCII chapter definitions -> initial state
+  maps.ts        ASCII chapter definitions -> initial state; campaign chapter list
   grid.ts        Dijkstra movement range, attack/threat range
   combat.ts      damage and counterattack forecasting
   ai.ts          CPU decision-making (one action at a time, stateless)
@@ -118,7 +124,7 @@ src/game/     rules layer — no React, no rendering
   blessings.ts   the 20-strong blessing pool, per-wave random draw
   log.ts         shared battle-log helper (avoids a game.ts <-> blessings.ts import cycle)
   game.ts        boardgame.io game definition: moves, phases, win conditions, EXP/leveling
-src/ui/       React board, panels, styling
+src/ui/       React board, title/chapter-select screens, panels, styling
 scripts/      headless battle simulator
 ```
 
@@ -164,7 +170,15 @@ artwork drawn for this project. See [CREDITS.md](CREDITS.md).
   real sprite art and its own active skill from level 1. Drop-based
   equipment (weapon/armor/accessory) layers on top of the blessing picks
   rather than replacing them
-- Next: Firebase Auth + Firestore save/resume, enemy AI using skills too
-  (currently player-only)
-- Later: weapon triangle, more maps
+- Campaign phase 1 (current): title screen, mode split, and one authored
+  chapter proving the menu -> mode -> play -> win/lose -> menu pipeline
+- Campaign phase 2 (next): more objective types (seize a tile, survive N
+  turns), 2-3 more authored chapters, and squad persistence between them
+  (levels/gear carry forward, chapter-select unlocks as you clear)
+- Phase 3: Thai/English localization — UI chrome plus class/skill/blessing
+  /item names and descriptions. The battle log stays English for now, since
+  translating it means restructuring log entries into `{key, params}` data
+  rather than the baked strings `pushLog` writes today
+- Later: Firebase Auth + Firestore save/resume, enemy AI using skills too
+  (currently player-only), weapon triangle
 - Later: online co-op for 5 players

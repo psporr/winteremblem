@@ -1,4 +1,4 @@
-import type { GameState, Team, TerrainType, Unit } from './types';
+import type { GameMode, GameState, ObjectiveType, Team, TerrainType, Unit } from './types';
 import { ALL_CLASSES, PLAYER_START_LEVEL, statsAtLevel, type ClassName } from './classes';
 
 /**
@@ -41,8 +41,10 @@ export interface RandomClassUnitSpec extends UnitPlacement {
 export type UnitSpec = FixedClassUnitSpec | RandomClassUnitSpec;
 
 export interface ChapterDef {
+  id: string;
   name: string;
   objective: string;
+  objectiveType: ObjectiveType;
   rows: string[];
   units: UnitSpec[];
 }
@@ -67,7 +69,7 @@ function parseTiles(rows: string[]): TerrainType[][] {
  * `ALL_CLASSES.length` random units gets balanced, no-duplicate coverage
  * that's still shuffled differently every battle.
  */
-export function buildGameState(chapter: ChapterDef, random: ShuffleAPI): GameState {
+export function buildGameState(chapter: ChapterDef, mode: GameMode, random: ShuffleAPI): GameState {
   const tiles = parseTiles(chapter.rows);
   const width = tiles[0]?.length ?? 0;
 
@@ -109,13 +111,17 @@ export function buildGameState(chapter: ChapterDef, random: ShuffleAPI): GameSta
   }
 
   return {
+    mode,
+    objectiveType: chapter.objectiveType,
+    chapterId: chapter.id,
     chapterName: chapter.name,
     objective: chapter.objective,
+    playerStart: playerStartPositions(chapter),
     width,
     height: tiles.length,
     tiles,
     units,
-    log: ['Wave 1 Starts'],
+    log: [mode === 'campaign' ? chapter.name : 'Wave 1 Starts'],
     wave: 1,
     awaitingBlessing: false,
     inventory: [],
@@ -151,8 +157,10 @@ export function playerStartPositions(chapter: ChapterDef): Record<string, { x: n
  * horizontal scrolling.
  */
 export const CHAPTER_1: ChapterDef = {
-  name: 'Chapter 1: The Frozen Pass',
+  id: 'frozen-pass',
+  name: 'The Frozen Pass',
   objective: 'Survive as many waves as you can',
+  objectiveType: 'waves',
   rows: [
     '..##...',
     '.......',
@@ -177,3 +185,44 @@ export const CHAPTER_1: ChapterDef = {
     { id: 'bandit-4', name: 'Bandit 4', team: 'enemy', randomClass: true, x: 4, y: 1 },
   ],
 };
+
+/**
+ * First campaign chapter. Unlike the roguelike map, enemy classes are fixed
+ * rather than drawn at random — a campaign encounter is hand-balanced, so
+ * the player can plan around a known composition. The wall band across the
+ * middle splits the field into two chokepoints, making the approach a real
+ * decision instead of a straight charge.
+ */
+export const CAMPAIGN_CHAPTER_1: ChapterDef = {
+  id: 'iron-gate',
+  name: 'Chapter 1: The Iron Gate',
+  objective: 'Defeat all enemies',
+  objectiveType: 'rout',
+  rows: [
+    '..###..',
+    '.......',
+    'ff...ff',
+    '..###..',
+    '.......',
+    '.ff.ff.',
+    '.......',
+    '...#...',
+  ],
+  units: [
+    { id: 'lyn', name: 'Lyn', team: 'player', className: 'Swordsman', x: 1, y: 6 },
+    { id: 'ake', name: 'Ake', team: 'player', className: 'Barbarian', x: 2, y: 6 },
+    { id: 'lissa', name: 'Lissa', team: 'player', className: 'Cleric', x: 3, y: 6 },
+    { id: 'corrin', name: 'Corrin', team: 'player', className: 'Lancer', x: 4, y: 6 },
+    { id: 'olivia', name: 'Olivia', team: 'player', className: 'Dancer', x: 5, y: 6 },
+    { id: 'byleth', name: 'Byleth', team: 'player', className: 'Archer', x: 1, y: 7 },
+    { id: 'selva', name: 'Selva', team: 'player', className: 'Mage', x: 4, y: 7 },
+    { id: 'gate-chief', name: 'Gate Chief', team: 'enemy', className: 'Barbarian', x: 3, y: 1 },
+    { id: 'gate-bow-1', name: 'Gate Archer', team: 'enemy', className: 'Archer', x: 0, y: 1 },
+    { id: 'gate-bow-2', name: 'Gate Archer', team: 'enemy', className: 'Archer', x: 6, y: 1 },
+    { id: 'gate-guard-1', name: 'Gate Guard', team: 'enemy', className: 'Swordsman', x: 2, y: 2 },
+    { id: 'gate-guard-2', name: 'Gate Guard', team: 'enemy', className: 'Lancer', x: 4, y: 2 },
+  ],
+};
+
+/** Every chapter the campaign can load, in play order. */
+export const CAMPAIGN_CHAPTERS: ChapterDef[] = [CAMPAIGN_CHAPTER_1];

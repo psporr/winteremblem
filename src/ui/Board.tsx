@@ -35,6 +35,7 @@ import {
 } from '../game/skills';
 import type { ItemSlot } from '../game/types';
 import type { GameOver } from '../game/game';
+import { useMenuActions } from './menuContext';
 import pkg from '../../package.json';
 import './board.css';
 
@@ -101,6 +102,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [inventoryUnitId, setInventoryUnitId] = useState<string | null>(null);
   const [waveBanner, setWaveBanner] = useState<number | null>(null);
+  const { exitToMenu, retry } = useMenuActions();
 
   const isPlayerPhase =
     ctx.currentPlayer === PLAYER_ID.player && !ctx.gameover && !G.awaitingBlessing;
@@ -549,9 +551,21 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     <div className="we-app">
       <header className="we-header">
         <h1>
-          Winter Emblem <span className="we-version">v{GAME_VERSION}</span>
+          {G.mode === 'campaign' ? G.chapterName : 'Winter Emblem'}{' '}
+          <span className="we-version">v{GAME_VERSION}</span>
         </h1>
         <div className="we-header-actions">
+          <button
+            type="button"
+            className="we-iconbutton we-iconbutton--icon"
+            aria-label="Main menu"
+            title="Main menu"
+            onClick={exitToMenu}
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path fill="currentColor" d="M12 3 2 12h3v8h6v-5h2v5h6v-8h3L12 3z" />
+            </svg>
+          </button>
           <button
             type="button"
             className="we-iconbutton we-iconbutton--icon"
@@ -739,7 +753,9 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
 
             {waveBanner != null && (
               <div key={waveBanner} className="we-wave-banner" aria-live="polite">
-                Wave {waveBanner} Starts
+                {/* Campaign has no waves — announce the chapter's objective
+                    instead, which is the thing a player needs at battle start. */}
+                {G.mode === 'campaign' ? G.objective : `Wave ${waveBanner} Starts`}
               </div>
             )}
           </div>
@@ -796,11 +812,22 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
       {gameover && (
         <div className="we-overlay">
           <div className="we-overlay__card">
-            <h2>Defeat</h2>
-            <p>Your company has been wiped out, having survived {G.wave} wave{G.wave === 1 ? '' : 's'}.</p>
-            <button type="button" className="we-button" onClick={() => window.location.reload()}>
-              Play again
-            </button>
+            <h2>{gameover.winner === 'player' ? 'Victory' : 'Defeat'}</h2>
+            <p>
+              {gameover.winner === 'player'
+                ? `${G.chapterName} complete — every enemy defeated.`
+                : G.mode === 'campaign'
+                  ? `Your company was wiped out in ${G.chapterName}.`
+                  : `Your company has been wiped out, having survived ${G.wave} wave${G.wave === 1 ? '' : 's'}.`}
+            </p>
+            <div className="we-overlay__actions">
+              <button type="button" className="we-button" onClick={retry}>
+                {gameover.winner === 'player' ? 'Play again' : 'Retry'}
+              </button>
+              <button type="button" className="we-button we-button--ghost" onClick={exitToMenu}>
+                Main menu
+              </button>
+            </div>
           </div>
         </div>
       )}

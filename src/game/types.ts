@@ -9,6 +9,22 @@ import type { ClassName } from './classes';
 
 export type Team = 'player' | 'enemy';
 
+/**
+ * Roguelike is the endless wave-survival run; campaign is a sequence of
+ * hand-authored chapters with their own win conditions. Both share every
+ * rule below this line — they differ only in how a battle starts and what
+ * counts as clearing it.
+ */
+export type GameMode = 'roguelike' | 'campaign';
+
+/**
+ * What clearing a battle means. 'waves' never ends on its own (roguelike
+ * loops until the squad wipes); 'rout' ends the chapter the moment the last
+ * enemy falls. More campaign objectives (seize, survive-N-turns) land in
+ * phase 2.
+ */
+export type ObjectiveType = 'waves' | 'rout';
+
 export type TerrainType = 'plain' | 'forest' | 'wall';
 
 export interface Terrain {
@@ -93,8 +109,18 @@ export interface Unit {
 }
 
 export interface GameState {
+  mode: GameMode;
+  objectiveType: ObjectiveType;
+  /** Which ChapterDef this battle was built from — campaign uses it to know what comes next. */
+  chapterId: string;
   chapterName: string;
   objective: string;
+  /**
+   * Where each player unit began. Roguelike resets the squad here between
+   * waves; kept in state rather than derived from a module-level chapter
+   * constant so different chapters can be loaded at runtime.
+   */
+  playerStart: Record<string, { x: number; y: number }>;
   width: number;
   height: number;
   /** Row-major terrain grid, indexed as tiles[y][x]. */

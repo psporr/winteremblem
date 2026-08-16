@@ -1,0 +1,160 @@
+/* Shares the palette defined on :root in board.css. */
+
+.we-title {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+}
+
+.we-title__inner {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+}
+
+.we-title__name {
+  margin: 0;
+  text-align: center;
+  font-size: 40px;
+  line-height: 1.1;
+  letter-spacing: 1px;
+  color: var(--ink);
+}
+
+.we-title__name span {
+  display: block;
+  color: var(--accent);
+}
+
+.we-title__name--small {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.we-title__tagline {
+  margin: 0 0 12px;
+  text-align: center;
+  color: var(--ink-dim);
+  font-size: 14px;
+}
+
+.we-title__modes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.we-mode-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-edge);
+  background: var(--panel);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+
+.we-mode-card:hover {
+  border-color: var(--accent);
+}
+
+.we-mode-card--roguelike:hover {
+  border-color: var(--danger);
+}
+
+.we-mode-card__name {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.we-mode-card--roguelike .we-mode-card__name {
+  color: var(--danger);
+}
+
+.we-mode-card__blurb {
+  font-size: 13px;
+  color: var(--ink-dim);
+  line-height: 1.45;
+}
+
+.we-mode-card__meta {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink-dim);
+  opacity: 0.75;
+}
+
+.we-title__version {
+  margin: 4px 0 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink-dim);
+  opacity: 0.6;
+}
+
+.we-chapter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.we-chapter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-edge);
+  background: var(--panel);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.we-chapter:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.we-chapter--locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.we-chapter__name {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.we-chapter__objective {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.we-title__back {
+  align-self: center;
+  margin-top: 8px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-edge);
+  background: transparent;
+  color: var(--ink-dim);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.we-title__back:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}

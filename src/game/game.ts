@@ -1,9 +1,10 @@
 import type { Ctx, Game, MoveMap } from 'boardgame.io';
 import { INVALID_MOVE } from 'boardgame.io/core';
 
-import type { GameState, ItemSlot, Team, Unit } from './types';
+import type { ChapterDef } from './maps';
+import type { GameMode, GameState, ItemSlot, Team, Unit } from './types';
 import { PLAYER_ID, teamOf } from './types';
-import { buildGameState, playerStartPositions, CHAPTER_1, type ShuffleAPI } from './maps';
+import { buildGameState, CAMPAIGN_CHAPTER_1, CHAPTER_1, type ShuffleAPI } from './maps';
 import { computeReachable, manhattan, tileKey, unitsOf } from './grid';
 import { canCounter, computeCounterDamage, computeDamage, forecastCombat } from './combat';
 import { BLESSINGS, drawBlessings } from './blessings';
@@ -21,8 +22,6 @@ import { pushLog } from './log';
 interface EndTurnAPI {
   endTurn?: () => void;
 }
-
-const PLAYER_START = playerStartPositions(CHAPTER_1);
 
 /**
  * Resolves the unit a move is allowed to command: it must exist, belong to the
@@ -53,13 +52,19 @@ export const moveUnit = (
   unit.hasMoved = true;
 };
 
-/** Marks the wave cleared once every enemy is gone, pausing play for a blessing pick. */
+/**
+ * Called whenever a unit dies. On a 'waves' objective (roguelike) an empty
+ * enemy side pauses play for a blessing pick and the run continues; on
+ * 'rout' (campaign) there's nothing to do here — the chapter is simply over,
+ * which `endIf` picks up on its own.
+ */
 function checkWaveCleared(G: GameState, random: DropRandomAPI): void {
-  if (unitsOf(G, 'enemy').length === 0) {
-    G.awaitingBlessing = true;
-    G.offeredBlessingIds = drawBlessings(G, random);
-    pushLog(G, 'All enemies defeated! Choose your blessing.');
-  }
+  if (unitsOf(G, 'enemy').length > 0) return;
+  if (G.objectiveType !== 'waves') return;
+
+  G.awaitingBlessing = true;
+  G.offeredBlessingIds = drawBlessings(G, random);
+  pushLog(G, 'All enemies defeated! Choose your blessing.');
 }
 
 /**
@@ -342,7 +347,7 @@ export const chooseBlessing = (
   for (const unit of unitsOf(G, 'player')) {
     unit.hasMoved = false;
     unit.hasActed = false;
-    const start = PLAYER_START[unit.id];
+    const start = G.playerStart[unit.id];
     if (start) {
       unit.x = start.x;
       unit.y = start.y;
@@ -375,10 +380,22 @@ export interface GameOver {
   winner: Team;
 }
 
-export const WinterEmblem: Game<GameState> = {
+/**
+ * Both modes share every rule in this file — they differ only in which
+ * chapter loads and what counts as clearing it, so they're the same Game
+ * definition built with different setup data rather than two engines.
+ */
+export function createWinterEmblem(mode: GameMode, chapter: ChapterDef): Game<GameState> {
+  return {
+    ...WinterEmblemBase,
+    setup: ({ random }) => buildGameState(chapter, mode, random),
+  };
+}
+
+const WinterEmblemBase: Game<GameState> = {
   name: 'winter-emblem',
 
-  setup: ({ random }) => buildGameState(CHAPTER_1, random),
+  setup: ({ random }) => buildGameState(CHAPTER_1, 'roguelike', random),
 
   // Two sides: '0' is the player's army, '1' is the CPU army.
   minPlayers: 2,
@@ -409,12 +426,20 @@ export const WinterEmblem: Game<GameState> = {
     },
   },
 
-  // Clearing a wave no longer ends the match — it's handled by
-  // chooseBlessing spawning the next one. The only way this run ends is a
-  // full wipe of the player's squad.
+  // A squad wipe always ends the battle. Beyond that it's objective-driven:
+  // 'waves' never ends in victory (clearing one just spawns the next via
+  // chooseBlessing), while 'rout' is won the moment the last enemy falls.
   endIf: ({ G }): GameOver | undefined => {
-    return unitsOf(G, 'player').length === 0 ? { winner: 'enemy' } : undefined;
+    if (unitsOf(G, 'player').length === 0) return { winner: 'enemy' };
+    if (G.objectiveType === 'rout' && unitsOf(G, 'enemy').length === 0) return { winner: 'player' };
+    return undefined;
   },
 };
+
+/** The endless wave-survival run — unchanged from before the mode split. */
+export const WinterEmblem = createWinterEmblem('roguelike', CHAPTER_1);
+
+/** Campaign chapter 1, a fixed-composition rout on its own map. */
+export const WinterEmblemCampaign = createWinterEmblem('campaign', CAMPAIGN_CHAPTER_1);
 
 export { PLAYER_ID };
