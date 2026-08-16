@@ -1,11 +1,15 @@
 /* Shares the palette defined on :root in board.css. */
 
+/* Top-aligned rather than vertically centred: centring left a large empty
+   band above the wordmark on a tall phone, which read as the title sitting
+   in the middle of the page instead of heading it. dvh rather than vh so
+   mobile browser chrome doesn't push the content further down. */
 .we-title {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 32px 20px;
+  padding: 40px 20px 32px;
 }
 
 .we-title__inner {
