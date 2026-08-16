@@ -693,6 +693,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
               <ActionPanel
                 unit={selected}
                 boardWidth={G.width}
+                boardHeight={G.height}
                 canAttack={attackTargets.length > 0}
                 skillLabel={canSkill && skillDef ? skillDef.name : null}
                 onAttack={handleAttackPressed}
@@ -793,6 +794,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
 function ActionPanel({
   unit,
   boardWidth,
+  boardHeight,
   canAttack,
   skillLabel,
   onAttack,
@@ -802,6 +804,7 @@ function ActionPanel({
 }: {
   unit: Unit;
   boardWidth: number;
+  boardHeight: number;
   canAttack: boolean;
   /** The skill's own name (e.g. "Heal"), or null when it's not usable right now. */
   skillLabel: string | null;
@@ -811,10 +814,14 @@ function ActionPanel({
   onBack: () => void;
 }) {
   const side = unit.x < boardWidth / 2 ? 'right' : 'left';
+  // Mirrors the left/right flip: a unit in the board's bottom half grows
+  // the menu upward from its tile instead of downward, so it can't run off
+  // the bottom of the viewport the way it used to for the last couple rows.
+  const vSide = unit.y < boardHeight / 2 ? 'down' : 'up';
 
   return (
     <div
-      className={`we-panel-anchor we-panel-anchor--${side}`}
+      className={`we-panel-anchor we-panel-anchor--${side} we-panel-anchor--${vSide}`}
       style={{
         transform: `translate(calc((var(--tile) + var(--tile-gap)) * ${unit.x}), calc((var(--tile) + var(--tile-gap)) * ${unit.y}))`,
       }}
@@ -1174,6 +1181,7 @@ function SkillConfirmCard({
   return (
     <div className="we-forecast-card">
       {title}
+      <div className="we-skill-card__preview">{describeSkillEffect(G, unit, target)}</div>
       <div className="we-forecast-card__matchup">
         <ForecastSide
           unit={unit}

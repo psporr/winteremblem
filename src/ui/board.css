@@ -646,6 +646,18 @@ body {
   left: calc(-132px - 8px);
 }
 
+/* Default: grows downward from the top of the unit's own tile. */
+.we-panel-anchor--down .we-menu {
+  top: 0;
+}
+
+/* Bottom-half units grow the menu upward instead, anchored to the tile's
+   bottom edge, so it can't run off the board (and the viewport) below. */
+.we-panel-anchor--up .we-menu {
+  top: auto;
+  bottom: 0;
+}
+
 .we-menu__item {
   padding: 8px 10px;
   border-radius: 7px;
