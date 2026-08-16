@@ -28,7 +28,18 @@
 
 .we-title__name span {
   display: block;
-  color: var(--accent);
+}
+
+/* Red-to-blue wordmark. The gradient is painted across the whole heading and
+   clipped to the glyphs, so it runs continuously through both lines rather
+   than restarting on the second. Scoped to --brand so ChapterSelect's plain
+   heading doesn't inherit it. */
+.we-title__name--brand {
+  background-image: linear-gradient(105deg, #f0616d 0%, #ff8a94 30%, #6ea8fe 70%, #9ec5ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
 }
 
 .we-title__name--small {

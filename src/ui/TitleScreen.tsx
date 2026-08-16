@@ -18,8 +18,8 @@ export function TitleScreen({
   return (
     <div className="we-title">
       <div className="we-title__inner">
-        <h1 className="we-title__name">
-          Winter <span>Emblem</span>
+        <h1 className="we-title__name we-title__name--brand">
+          BIBI&rsquo;s <span>WinterEmblem</span>
         </h1>
         <p className="we-title__tagline">A turn-based tactics RPG</p>
 

@@ -551,7 +551,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     <div className="we-app">
       <header className="we-header">
         <h1>
-          {G.mode === 'campaign' ? G.chapterName : 'Winter Emblem'}{' '}
+          {G.mode === 'campaign' ? G.chapterName : "BIBI's WinterEmblem"}{' '}
           <span className="we-version">v{GAME_VERSION}</span>
         </h1>
         <div className="we-header-actions">

@@ -1,4 +1,4 @@
-# Winter Emblem
+# BIBI's WinterEmblem
 
 A turn-based tactics RPG in the Fire Emblem mould, built for the browser.
 

@@ -1,5 +1,5 @@
 /**
- * Core data model for Winter Emblem.
+ * Core data model for BIBI's WinterEmblem.
  *
  * Everything in `GameState` must stay JSON-serialisable: boardgame.io transports
  * it as plain data today, and it will be persisted to Firestore later on.
