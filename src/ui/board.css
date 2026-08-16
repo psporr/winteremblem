@@ -872,16 +872,22 @@ body {
   color: var(--ink);
 }
 
-/* Purely decorative, so it never intercepts taps meant for the board
-   underneath — the game keeps running while this fades in and out. */
+/* Centered on the tile grid itself (.we-board is its positioning parent),
+   not the viewport — and purely decorative, so it never intercepts taps
+   meant for the board underneath while it fades in and out. */
 .we-wave-banner {
-  position: fixed;
+  position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 20;
   pointer-events: none;
-  font-size: 32px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  background: rgba(13, 20, 32, 0.72);
+  border: 1px solid var(--panel-edge);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  font-size: 24px;
   font-weight: 800;
   letter-spacing: 1px;
   color: var(--ink);

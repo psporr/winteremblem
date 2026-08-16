@@ -734,6 +734,12 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 onCancel={handleCancelSkillConfirm}
               />
             )}
+
+            {waveBanner != null && (
+              <div key={waveBanner} className="we-wave-banner" aria-live="polite">
+                Wave {waveBanner} Starts
+              </div>
+            )}
           </div>
         </div>
 
@@ -757,12 +763,6 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
           onUnequip={(unitId, slot) => moves.unequipItem(unitId, slot)}
           onClose={() => setInventoryOpen(false)}
         />
-      )}
-
-      {waveBanner != null && (
-        <div key={waveBanner} className="we-wave-banner" aria-live="polite">
-          Wave {waveBanner} Starts
-        </div>
       )}
 
       {G.awaitingBlessing && !gameover && (
