@@ -1,0 +1,68 @@
+/* Styling for the throwaway Phaser prototype screen. Kept in its own file so
+   backing the experiment out is a matter of deleting two files. */
+
+.we-phaser {
+  min-height: 100dvh;
+  padding: 12px 12px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  background: #0b1220;
+  color: #e6edf7;
+  box-sizing: border-box;
+}
+
+.we-phaser__bar {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.we-phaser__title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.we-phaser__back {
+  padding: 6px 14px;
+  border: 1px solid #2b3a55;
+  border-radius: 8px;
+  background: #16203a;
+  color: #e6edf7;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.we-phaser__back:hover {
+  background: #1d2a4a;
+}
+
+.we-phaser__host {
+  width: 100%;
+  max-width: 420px;
+  border: 1px solid #223049;
+  border-radius: 10px;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.we-phaser__host canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.we-phaser__note {
+  width: 100%;
+  max-width: 420px;
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: #9fb3d1;
+}
