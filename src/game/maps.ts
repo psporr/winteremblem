@@ -42,7 +42,14 @@ export type UnitSpec = FixedClassUnitSpec | RandomClassUnitSpec;
 
 export interface ChapterDef {
   id: string;
+  /** Full title, shown on the chapter-select screen. */
   name: string;
+  /**
+   * Compact title for the in-battle header, which sits beside the icon row
+   * and has very little width on a phone. Explicit rather than derived by
+   * splitting `name` on ':' so a chapter can choose its own abbreviation.
+   */
+  shortName: string;
   objective: string;
   objectiveType: ObjectiveType;
   rows: string[];
@@ -115,6 +122,7 @@ export function buildGameState(chapter: ChapterDef, mode: GameMode, random: Shuf
     objectiveType: chapter.objectiveType,
     chapterId: chapter.id,
     chapterName: chapter.name,
+    chapterShortName: chapter.shortName,
     objective: chapter.objective,
     playerStart: playerStartPositions(chapter),
     width,
@@ -159,6 +167,7 @@ export function playerStartPositions(chapter: ChapterDef): Record<string, { x: n
 export const CHAPTER_1: ChapterDef = {
   id: 'frozen-pass',
   name: 'The Frozen Pass',
+  shortName: 'The Frozen Pass',
   objective: 'Survive as many waves as you can',
   objectiveType: 'waves',
   rows: [
@@ -196,6 +205,7 @@ export const CHAPTER_1: ChapterDef = {
 export const CAMPAIGN_CHAPTER_1: ChapterDef = {
   id: 'iron-gate',
   name: 'Chapter 1: The Iron Gate',
+  shortName: 'The Iron Gate',
   objective: 'Defeat all enemies',
   objectiveType: 'rout',
   rows: [

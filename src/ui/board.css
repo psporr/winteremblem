@@ -30,22 +30,33 @@ body {
 .we-app {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 24px 20px 48px;
+  /* The bottom pad clears mobile browser chrome (iOS Safari's toolbar sits
+     over the page), so the last panel can always be scrolled clear of it.
+     env() adds the device's own inset on top where one exists. */
+  padding: 16px 20px calc(96px + env(safe-area-inset-bottom, 0px));
 }
 
 .we-header {
   display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
+  /* Never wraps: a long chapter name shrinks and ellipsises instead of
+     pushing the icon row onto a second line and shoving the board down. */
+  flex-wrap: nowrap;
+  gap: 12px;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .we-header h1 {
   margin: 0;
-  font-size: 22px;
+  font-size: 18px;
   letter-spacing: 0.3px;
+  /* min-width:0 lets a flex item shrink below its content width, which is
+     what makes the ellipsis actually engage. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .we-version {
@@ -57,7 +68,9 @@ body {
 .we-header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  /* Never squeezed by a long title — the title yields instead. */
+  flex-shrink: 0;
 }
 
 .we-iconbutton {
@@ -82,8 +95,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border-radius: 50%;
 }
@@ -110,7 +123,7 @@ body {
 .we-layout {
   display: flex;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 12px;
   align-items: flex-start;
 }
 
@@ -440,14 +453,14 @@ body {
   min-width: 250px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .we-panel {
   background: var(--panel);
   border: 1px solid var(--panel-edge);
   border-radius: 10px;
-  padding: 14px;
+  padding: 10px 12px;
 }
 
 .we-panel--empty {
@@ -468,13 +481,13 @@ body {
 }
 
 .we-panel__hp {
-  margin-top: 6px;
-  font-size: 14px;
+  margin-top: 4px;
+  font-size: 13px;
   color: var(--ink-dim);
 }
 
 .we-panel__exp {
-  margin-top: 6px;
+  margin-top: 4px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -503,26 +516,27 @@ body {
 .we-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  margin: 12px 0 0;
+  gap: 5px;
+  margin: 8px 0 0;
 }
 
 .we-stats div {
   background: #101a28;
   border-radius: 6px;
-  padding: 6px 4px;
+  padding: 4px 4px;
   text-align: center;
 }
 
 .we-stats dt {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--ink-dim);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .we-stats dd {
-  margin: 2px 0 0;
+  margin: 1px 0 0;
+  font-size: 15px;
   font-weight: 700;
 }
 
@@ -533,7 +547,7 @@ body {
 }
 
 .we-panel__skill {
-  margin-top: 10px;
+  margin-top: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -552,7 +566,7 @@ body {
 }
 
 .we-panel__terrain {
-  margin-top: 10px;
+  margin-top: 8px;
   font-size: 12px;
   color: var(--ink-dim);
 }

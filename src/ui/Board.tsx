@@ -36,10 +36,7 @@ import {
 import type { ItemSlot } from '../game/types';
 import type { GameOver } from '../game/game';
 import { useMenuActions } from './menuContext';
-import pkg from '../../package.json';
 import './board.css';
-
-const GAME_VERSION = pkg.version;
 
 /** Pause between CPU actions so the player can follow what happened. */
 const ENEMY_ACTION_DELAY = 550;
@@ -550,10 +547,10 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   return (
     <div className="we-app">
       <header className="we-header">
-        <h1>
-          {G.mode === 'campaign' ? G.chapterName : "BIBI's WinterEmblem"}{' '}
-          <span className="we-version">v{GAME_VERSION}</span>
-        </h1>
+        {/* Names the battle you're in, both modes — the game's own name (and
+            version) live on the title screen, where there's room for them.
+            "BIBI's WinterEmblem" doesn't fit beside the icon row on a phone. */}
+        <h1>{G.chapterShortName}</h1>
         <div className="we-header-actions">
           <button
             type="button"

@@ -114,6 +114,8 @@ export interface GameState {
   /** Which ChapterDef this battle was built from — campaign uses it to know what comes next. */
   chapterId: string;
   chapterName: string;
+  /** Compact chapter title for the in-battle header. */
+  chapterShortName: string;
   objective: string;
   /**
    * Where each player unit began. Roguelike resets the squad here between
