@@ -654,11 +654,12 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 const occupant = unitAt(G, x, y);
                 const classes = ['we-tile', `we-tile--${terrainType}`];
 
+                const isAttackTarget = mode === 'targeting' && occupant && attackTargetIds.has(occupant.id);
+                const isSkillTarget = mode === 'skill-targeting' && occupant && skillTargetIds.has(occupant.id);
+
                 if (reachable.has(key) && !occupant) classes.push('we-tile--move');
-                if (mode === 'targeting' && occupant && attackTargetIds.has(occupant.id)) {
-                  classes.push('we-tile--attack');
-                }
-                if (mode === 'skill-targeting' && occupant && skillTargetIds.has(occupant.id)) {
+                if (isAttackTarget) classes.push('we-tile--attack');
+                if (isSkillTarget) {
                   classes.push(skillDef?.targetType === 'ally' ? 'we-tile--support' : 'we-tile--attack');
                 }
                 if (novaBlastTiles.has(key)) classes.push('we-tile--blast');
@@ -666,6 +667,19 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                   classes.push('we-tile--selected');
                 }
                 if (threatTiles.has(key)) classes.push('we-tile--threat');
+                // Whichever unit's stats are currently shown in the side panel — via
+                // hover, tap, or a pending attack/skill target — gets its own tile
+                // outlined too, so tapping an enemy or an already-acted ally to
+                // inspect them doesn't leave the board looking unresponsive.
+                if (
+                  previewTarget &&
+                  occupant?.id === previewTarget.id &&
+                  !isAttackTarget &&
+                  !isSkillTarget &&
+                  !(selected && selected.x === x && selected.y === y)
+                ) {
+                  classes.push('we-tile--inspected');
+                }
 
                 return (
                   <button

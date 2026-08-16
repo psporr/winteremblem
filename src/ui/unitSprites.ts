@@ -25,7 +25,7 @@ const CLERIC_VARIANTS: Record<string, UnitSprite> = {
   /** Single hand-drawn frame, synthesized into a 4-frame bob via a 1px vertical shift. */
   v2: { src: clericSheetV2, frameWidth: 32, frameHeight: 32, frames: 4 },
 };
-const ACTIVE_CLERIC_VARIANT: keyof typeof CLERIC_VARIANTS = 'v2';
+const ACTIVE_CLERIC_VARIANT: keyof typeof CLERIC_VARIANTS = 'original';
 
 /** Original artwork by a friend — no external license to track. */
 export const UNIT_SPRITES: Record<string, UnitSprite> = {
