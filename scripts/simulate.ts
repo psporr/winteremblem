@@ -25,7 +25,6 @@ client.start();
 let actions = 0;
 let lastTurn = -1;
 let lastWave = 0;
-let blessingIndex = 0;
 
 while (actions < MAX_ACTIONS) {
   const state = client.getState();
@@ -40,8 +39,10 @@ while (actions < MAX_ACTIONS) {
   }
 
   if (G.awaitingBlessing) {
-    const blessing = BLESSINGS[blessingIndex % BLESSINGS.length];
-    blessingIndex++;
+    // Only 3 of the 20-strong pool are actually offered each wave-clear —
+    // pick the first one actually on offer rather than cycling blindly.
+    const offeredId = G.offeredBlessingIds[0];
+    const blessing = BLESSINGS.find((candidate) => candidate.id === offeredId) ?? BLESSINGS[0];
     console.log(`  choosing blessing: ${blessing.name}`);
     client.moves.chooseBlessing(blessing.id);
     // G here is the pre-move snapshot; re-fetch to see the wave number the

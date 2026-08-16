@@ -120,6 +120,18 @@ export function buildGameState(chapter: ChapterDef, random: ShuffleAPI): GameSta
     awaitingBlessing: false,
     inventory: [],
     nextItemInstance: 0,
+    modifiers: {
+      counterBonus: 0,
+      cooldownReduction: 0,
+      healPerTurn: 0,
+      terrainDefMultiplier: 1,
+      executionerBonus: 0,
+      guardianAngelMax: 0,
+      guardianAngelCharges: 0,
+      dropChanceMultiplier: 1,
+    },
+    fallenUnits: [],
+    offeredBlessingIds: [],
   };
 }
 

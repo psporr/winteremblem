@@ -1,6 +1,6 @@
 import type { GameState, Team, Terrain, Unit } from './types';
 import { TERRAIN } from './types';
-import { effectiveStats } from './equipment';
+import { effectiveStats, forestMoveCostFor } from './equipment';
 
 export interface Coord {
   x: number;
@@ -81,7 +81,8 @@ export function computeReachable(G: GameState, unit: Unit): Map<string, Reachabl
       const occupant = unitAt(G, x, y);
       if (occupant && occupant.team !== unit.team) continue;
 
-      const cost = current.cost + terrain.moveCost;
+      const terrainCost = terrain.type === 'forest' ? forestMoveCostFor(unit, terrain.moveCost) : terrain.moveCost;
+      const cost = current.cost + terrainCost;
       if (cost > move) continue;
 
       const key = tileKey(x, y);

@@ -64,14 +64,17 @@ Command flow follows classic Fire Emblem, tuned for touch:
 Combat is deterministic in v1: damage is `Atk − (Def + terrain bonus)`, minimum 1.
 A defender counterattacks if it survives and the attacker is within its own reach.
 
-**Waves.** Clearing every enemy doesn't end the run — it pauses for a blessing
-pick (a squad-wide +Atk, +Def, or full heal), then a new, tougher wave spawns
-and the squad resets to their start tiles. Fallen units stay fallen for the
-rest of the run; there's no separate permadeath toggle because a run only ever
-has one life. The run ends when the whole squad is wiped. A "Wave N Starts"
-banner floats center-screen for a couple seconds at the start of every wave,
-including the first — purely decorative, the board stays fully interactive
-underneath.
+**Waves.** Clearing every enemy doesn't end the run — it pauses for a
+blessing pick (3 drawn at random from a 20-strong pool: squad-wide stat
+buffs, single-unit picks like Underdog/Champion, and permanent modifiers
+like Thorns or Ironclad that stack across the whole run), then a new,
+tougher wave spawns and the squad resets to their start tiles. There's no
+separate permadeath toggle — a fallen unit stays down unless Blessing of the
+Fallen is drawn and picked, which revives one at half HP — so the run still
+ends the moment the whole squad is down at once with no way back. A "Wave N
+Starts" banner floats center-screen for a couple seconds at the start of
+every wave, including the first — purely decorative, the board stays fully
+interactive underneath.
 
 **Leveling.** Every attack grants EXP to whoever threw it, win or lose;
 reaching 100 EXP levels a unit up (atk/def/maxHp increase, and the unit heals
@@ -80,10 +83,14 @@ start — while enemies start at level 1 on wave 1 and level up wave-for-wave,
 so the level gap only narrows as a run goes on.
 
 **Equipment.** Defeated Bandits have a chance to drop a weapon, armor, or
-accessory — the chance and the drop's slot both scale with wave number, so
-late-run kills pay off more. Drops land in a shared squad inventory; open it
-with the bag icon (top right, player phase only) to equip gear onto any unit
-or send a piece back to the inventory. Equipping doesn't cost a turn.
+accessory — the chance and the drop's slot both scale with wave number (and
+Blessing of Fortune doubles it for one wave), so late-run kills pay off
+more. 20 items across the 3 slots, mostly flat stat trade-offs, plus a few
+with a small extra effect: Vampiric Fang heals on a kill, Dragonscale blunts
+counter damage, Forest Talisman cuts forest's movement cost. Drops land in a
+shared squad inventory; open it with the bag icon (top right, player phase
+only) to equip gear onto any unit or send a piece back to the inventory.
+Equipping doesn't cost a turn.
 
 **Skills.** Every class has one active skill available from level 1 — a
 third option next to Attack/Wait, on a 3-turn cooldown after use. Cleric
@@ -108,7 +115,8 @@ src/game/     rules layer — no React, no rendering
   combat.ts      damage and counterattack forecasting
   ai.ts          CPU decision-making (one action at a time, stateless)
   waves.ts       procedural enemy composition, wave-as-level difficulty scaling
-  blessings.ts   squad-wide buffs offered after a wave clears
+  blessings.ts   the 20-strong blessing pool, per-wave random draw
+  log.ts         shared battle-log helper (avoids a game.ts <-> blessings.ts import cycle)
   game.ts        boardgame.io game definition: moves, phases, win conditions, EXP/leveling
 src/ui/       React board, panels, styling
 scripts/      headless battle simulator

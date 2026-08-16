@@ -1,3 +1,5 @@
+import type { Unit } from './types';
+
 /**
  * Base stats per class. A unit's className always determines its stats —
  * player and enemy units of the same class share the same numbers — so
@@ -75,4 +77,26 @@ export function statsAtLevel(className: ClassName, level: number): ClassStats {
     move: base.move,
     range: base.range,
   };
+}
+
+/**
+ * Grants EXP and rolls any level-ups it crosses, recomputing atk/def/maxHp
+ * from the class curve and healing by the maxHp gained so leveling never
+ * feels like a step backwards. Shared by combat (game.ts) and the Wisdom
+ * blessing (blessings.ts) — `onLevelUp` lets each caller log the moment in
+ * its own voice without this module needing to know about the battle log.
+ */
+export function grantExp(unit: Unit, amount: number, onLevelUp?: (unit: Unit) => void): void {
+  unit.exp += amount;
+  while (unit.exp >= EXP_TO_LEVEL) {
+    unit.exp -= EXP_TO_LEVEL;
+    unit.level += 1;
+    const stats = statsAtLevel(unit.className, unit.level);
+    const hpGain = stats.maxHp - unit.maxHp;
+    unit.maxHp = stats.maxHp;
+    unit.atk = stats.atk;
+    unit.def = stats.def;
+    unit.hp = Math.min(stats.maxHp, unit.hp + hpGain);
+    onLevelUp?.(unit);
+  }
 }

@@ -5,12 +5,13 @@ import type { GameState, ItemSlot, Team, Unit } from './types';
 import { PLAYER_ID, teamOf } from './types';
 import { buildGameState, playerStartPositions, CHAPTER_1, type ShuffleAPI } from './maps';
 import { computeReachable, manhattan, tileKey, unitsOf } from './grid';
-import { canCounter, computeDamage, forecastCombat } from './combat';
-import { BLESSINGS } from './blessings';
+import { canCounter, computeCounterDamage, computeDamage, forecastCombat } from './combat';
+import { BLESSINGS, drawBlessings } from './blessings';
 import { spawnWave } from './waves';
-import { EXP_PER_ATTACK, EXP_TO_LEVEL, statsAtLevel } from './classes';
-import { effectiveStats, ITEMS, rollDrop, type DropRandomAPI } from './equipment';
+import { EXP_PER_ATTACK, grantExp as grantExpToUnit } from './classes';
+import { effectiveStats, equippedKillHeal, ITEMS, rollDrop, type DropRandomAPI } from './equipment';
 import { HEAL_BONUS, NOVA_DAMAGE_MULTIPLIER, SKILLS, SNIPE_BONUS, novaBlastTargets, skillTargets } from './skills';
+import { pushLog } from './log';
 
 /**
  * The slice of boardgame.io's EventsAPI we actually need. Defined locally,
@@ -21,13 +22,7 @@ interface EndTurnAPI {
   endTurn?: () => void;
 }
 
-const MAX_LOG_ENTRIES = 40;
 const PLAYER_START = playerStartPositions(CHAPTER_1);
-
-function pushLog(G: GameState, message: string): void {
-  G.log.unshift(message);
-  if (G.log.length > MAX_LOG_ENTRIES) G.log.length = MAX_LOG_ENTRIES;
-}
 
 /**
  * Resolves the unit a move is allowed to command: it must exist, belong to the
@@ -59,9 +54,10 @@ export const moveUnit = (
 };
 
 /** Marks the wave cleared once every enemy is gone, pausing play for a blessing pick. */
-function checkWaveCleared(G: GameState): void {
+function checkWaveCleared(G: GameState, random: DropRandomAPI): void {
   if (unitsOf(G, 'enemy').length === 0) {
     G.awaitingBlessing = true;
+    G.offeredBlessingIds = drawBlessings(G, random);
     pushLog(G, 'All enemies defeated! Choose your blessing.');
   }
 }
@@ -70,19 +66,40 @@ function checkWaveCleared(G: GameState): void {
  * Removes a fallen unit, rolls its loot if it was an enemy, and checks
  * whether that was the wave's last one. Shared by plain attacks and any
  * skill that can kill, so drops and the wave-clear check never drift out of
- * sync between the two.
+ * sync between the two. Also the single chokepoint for two blessing
+ * effects: Guardian Angel (a lethal hit on a player unit can be survived
+ * instead) and The Fallen (a player unit that does die is remembered for
+ * revival), plus Vampiric Fang's kill-heal for whoever landed the blow.
  */
-function killUnit(G: GameState, unit: Unit, random: DropRandomAPI): void {
+function killUnit(G: GameState, unit: Unit, random: DropRandomAPI, killer?: Unit): void {
+  if (unit.team === 'player' && G.modifiers.guardianAngelCharges > 0) {
+    G.modifiers.guardianAngelCharges -= 1;
+    unit.hp = 1;
+    pushLog(G, `${unit.name} is saved by a Guardian Angel!`);
+    return;
+  }
+
   pushLog(G, `${unit.name} has fallen!`);
   delete G.units[unit.id];
-  if (unit.team === 'enemy') {
+  if (unit.team === 'player') {
+    G.fallenUnits.push(unit);
+  } else {
     const drop = rollDrop(G, G.wave, random);
     if (drop) {
       G.inventory.push(drop);
       pushLog(G, `${unit.name} dropped ${ITEMS[drop.defId].name}!`);
     }
   }
-  checkWaveCleared(G);
+
+  if (killer) {
+    const heal = equippedKillHeal(killer);
+    if (heal > 0 && killer.hp > 0) {
+      killer.hp = Math.min(killer.maxHp, killer.hp + heal);
+      pushLog(G, `${killer.name} drains ${heal} HP from the kill.`);
+    }
+  }
+
+  checkWaveCleared(G, random);
 }
 
 /**
@@ -93,36 +110,18 @@ function killUnit(G: GameState, unit: Unit, random: DropRandomAPI): void {
  */
 function resolveSkillCounter(G: GameState, attacker: Unit, target: Unit, random: DropRandomAPI): boolean {
   if (!canCounter(attacker, target)) return true;
-  const counter = computeDamage(G, target, attacker);
+  const counter = computeCounterDamage(G, target, attacker);
   attacker.hp = Math.max(0, attacker.hp - counter);
   pushLog(G, `${target.name} counters for ${counter}.`);
   if (attacker.hp <= 0) {
-    killUnit(G, attacker, random);
+    killUnit(G, attacker, random, target);
     return false;
   }
   return true;
 }
 
-/**
- * Every attack grants EXP to whoever threw the punch, win or lose. A level
- * up recomputes atk/def/maxHp from the class curve and heals by the maxHp
- * gained, so leveling never feels like a step backwards. Looped rather than
- * a single `if`, in case a future EXP source ever grants enough to cross
- * more than one level at once.
- */
 function grantExp(G: GameState, unit: Unit): void {
-  unit.exp += EXP_PER_ATTACK;
-  while (unit.exp >= EXP_TO_LEVEL) {
-    unit.exp -= EXP_TO_LEVEL;
-    unit.level += 1;
-    const stats = statsAtLevel(unit.className, unit.level);
-    const hpGain = stats.maxHp - unit.maxHp;
-    unit.maxHp = stats.maxHp;
-    unit.atk = stats.atk;
-    unit.def = stats.def;
-    unit.hp = Math.min(stats.maxHp, unit.hp + hpGain);
-    pushLog(G, `${unit.name} reached level ${unit.level}!`);
-  }
+  grantExpToUnit(unit, EXP_PER_ATTACK, (leveled) => pushLog(G, `${leveled.name} reached level ${leveled.level}!`));
 }
 
 export const attackUnit = (
@@ -142,12 +141,12 @@ export const attackUnit = (
   pushLog(G, `${attacker.name} hits ${target.name} for ${result.damageDealt}.`);
 
   if (result.willKill) {
-    killUnit(G, target, random);
+    killUnit(G, target, random, attacker);
   } else if (result.counterDamage !== null) {
     attacker.hp = result.attackerHpAfter;
     pushLog(G, `${target.name} counters for ${result.counterDamage}.`);
     if (result.attackerWillDie) {
-      killUnit(G, attacker, random);
+      killUnit(G, attacker, random, target);
       return;
     }
   }
@@ -212,7 +211,7 @@ export const useSkill = (
       }
       pushLog(G, `${unit.name} strikes ${target.name} twice for ${dealt}.`);
       if (target.hp <= 0) {
-        killUnit(G, target, random);
+        killUnit(G, target, random, unit);
       } else if (!resolveSkillCounter(G, unit, target, random)) {
         return;
       }
@@ -225,7 +224,7 @@ export const useSkill = (
       target.hp = Math.max(0, target.hp - dmg);
       pushLog(G, `${unit.name} breaks ${target.name}'s guard for ${dmg}.`);
       if (target.hp <= 0) {
-        killUnit(G, target, random);
+        killUnit(G, target, random, unit);
       } else if (!resolveSkillCounter(G, unit, target, random)) {
         return;
       }
@@ -237,7 +236,7 @@ export const useSkill = (
       const dmg = computeDamage(G, unit, target) + SNIPE_BONUS;
       target.hp = Math.max(0, target.hp - dmg);
       pushLog(G, `${unit.name} snipes ${target.name} for ${dmg}. No counter possible.`);
-      if (target.hp <= 0) killUnit(G, target, random);
+      if (target.hp <= 0) killUnit(G, target, random, unit);
       break;
     }
 
@@ -249,7 +248,7 @@ export const useSkill = (
         const dmg = Math.max(1, Math.round(computeDamage(G, unit, hitTarget) * NOVA_DAMAGE_MULTIPLIER));
         hitTarget.hp = Math.max(0, hitTarget.hp - dmg);
         totalDealt += dmg;
-        if (hitTarget.hp <= 0) killUnit(G, hitTarget, random);
+        if (hitTarget.hp <= 0) killUnit(G, hitTarget, random, unit);
       }
       pushLog(
         G,
@@ -264,8 +263,8 @@ export const useSkill = (
       target.hp = Math.max(0, target.hp - dmg);
       pushLog(G, `${unit.name} rampages into ${target.name} for ${dmg}.`);
       if (target.hp <= 0) {
-        killUnit(G, target, random);
-        unit.skillCooldown = skill.cooldown;
+        killUnit(G, target, random, unit);
+        unit.skillCooldown = Math.max(1, skill.cooldown - G.modifiers.cooldownReduction);
         grantExp(G, unit);
         // Deliberately leaves hasMoved/hasActed false — a kill refunds the turn.
         return;
@@ -278,7 +277,7 @@ export const useSkill = (
       return INVALID_MOVE;
   }
 
-  unit.skillCooldown = skill.cooldown;
+  unit.skillCooldown = Math.max(1, skill.cooldown - G.modifiers.cooldownReduction);
   grantExp(G, unit);
   unit.hasMoved = true;
   unit.hasActed = true;
@@ -316,9 +315,10 @@ export const unequipItem = ({ G, ctx }: { G: GameState; ctx: Ctx }, unitId: stri
 };
 
 /**
- * Applies the chosen blessing to every surviving player unit, resets the
- * squad to their start tiles, and spawns the next wave. Only valid right
- * after a wave is cleared.
+ * Applies the chosen blessing, resets the squad to their start tiles, and
+ * spawns the next wave. Only valid right after a wave is cleared, and only
+ * for one of the 3 ids actually offered this pause (drawn in
+ * checkWaveCleared) — not just any id in the full 20-strong pool.
  *
  * If the last enemy fell during the enemy's own turn (e.g. a counterattack),
  * this also force-ends that turn so the fresh wave's enemies don't get
@@ -329,12 +329,17 @@ export const chooseBlessing = (
   blessingId: string,
 ) => {
   if (!G.awaitingBlessing) return INVALID_MOVE;
+  if (!G.offeredBlessingIds.includes(blessingId)) return INVALID_MOVE;
 
   const blessing = BLESSINGS.find((candidate) => candidate.id === blessingId);
   if (!blessing) return INVALID_MOVE;
 
+  // Fortune's boost only ever covers the single wave right after it's
+  // picked — reset before applying, so picking anything else lets it lapse.
+  G.modifiers.dropChanceMultiplier = 1;
+  blessing.apply(G);
+
   for (const unit of unitsOf(G, 'player')) {
-    blessing.apply(unit);
     unit.hasMoved = false;
     unit.hasActed = false;
     const start = PLAYER_START[unit.id];
@@ -344,9 +349,11 @@ export const chooseBlessing = (
     }
   }
 
+  G.modifiers.guardianAngelCharges = G.modifiers.guardianAngelMax;
   G.wave += 1;
   spawnWave(G, G.wave, random);
   G.awaitingBlessing = false;
+  G.offeredBlessingIds = [];
   pushLog(G, `— Wave ${G.wave} —`);
 
   if (teamOf(ctx.currentPlayer) !== 'player') {
@@ -386,6 +393,11 @@ export const WinterEmblem: Game<GameState> = {
         unit.hasMoved = false;
         unit.hasActed = false;
         if (unit.skillCooldown > 0) unit.skillCooldown -= 1;
+      }
+      if (team === 'player' && G.modifiers.healPerTurn > 0) {
+        for (const unit of unitsOf(G, 'player')) {
+          unit.hp = Math.min(unit.maxHp, unit.hp + G.modifiers.healPerTurn);
+        }
       }
       pushLog(G, team === 'player' ? '— Player phase —' : '— Enemy phase —');
     },

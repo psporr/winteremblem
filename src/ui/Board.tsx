@@ -15,7 +15,7 @@ import {
   unitsOf,
   type ReachableTile,
 } from '../game/grid';
-import { canCounter, computeDamage, forecastCombat, type CombatForecast } from '../game/combat';
+import { canCounter, computeCounterDamage, computeDamage, forecastCombat, type CombatForecast } from '../game/combat';
 import { decideEnemyAction } from '../game/ai';
 import { BLESSINGS } from '../game/blessings';
 import { EXP_TO_LEVEL } from '../game/classes';
@@ -420,7 +420,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
           const hpAfter2 = Math.max(0, hpAfter1 - dmg2);
           beats.push([{ unitId: target.id, hp: hpAfter2, shake: true, floatingNumber: { value: dmg2, kind: 'damage' } }]);
           if (hpAfter2 > 0 && canCounter(unit, target)) {
-            const counterDmg = computeDamage(G, target, unit);
+            const counterDmg = computeCounterDamage(G, target, unit);
             beats.push([
               { unitId: unit.id, hp: Math.max(0, unit.hp - counterDmg), shake: true, floatingNumber: { value: counterDmg, kind: 'damage' } },
             ]);
@@ -437,7 +437,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
           [{ unitId: target.id, hp: hpAfter, shake: true, floatingNumber: { value: dmg, kind: 'damage' } }],
         ];
         if (hpAfter > 0 && canCounter(unit, target)) {
-          const counterDmg = computeDamage(G, target, unit);
+          const counterDmg = computeCounterDamage(G, target, unit);
           beats.push([
             { unitId: unit.id, hp: Math.max(0, unit.hp - counterDmg), shake: true, floatingNumber: { value: counterDmg, kind: 'damage' } },
           ]);
@@ -475,7 +475,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
           [{ unitId: target.id, hp: hpAfter, shake: true, floatingNumber: { value: dmg, kind: 'damage' } }],
         ];
         if (hpAfter > 0 && canCounter(unit, target)) {
-          const counterDmg = computeDamage(G, target, unit);
+          const counterDmg = computeCounterDamage(G, target, unit);
           beats.push([
             { unitId: unit.id, hp: Math.max(0, unit.hp - counterDmg), shake: true, floatingNumber: { value: counterDmg, kind: 'damage' } },
           ]);
@@ -771,17 +771,21 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
             <h2>Wave {G.wave} cleared!</h2>
             <p>Choose a blessing before Wave {G.wave + 1} begins.</p>
             <div className="we-blessing-list">
-              {BLESSINGS.map((blessing) => (
-                <button
-                  key={blessing.id}
-                  type="button"
-                  className="we-blessing"
-                  onClick={() => moves.chooseBlessing(blessing.id)}
-                >
-                  <strong>{blessing.name}</strong>
-                  <span>{blessing.description}</span>
-                </button>
-              ))}
+              {G.offeredBlessingIds.map((id) => {
+                const blessing = BLESSINGS.find((candidate) => candidate.id === id);
+                if (!blessing) return null;
+                return (
+                  <button
+                    key={blessing.id}
+                    type="button"
+                    className="we-blessing"
+                    onClick={() => moves.chooseBlessing(blessing.id)}
+                  >
+                    <strong>{blessing.name}</strong>
+                    <span>{blessing.description}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

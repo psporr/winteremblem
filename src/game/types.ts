@@ -38,6 +38,30 @@ export interface Item {
 
 export type EquipmentSlots = Partial<Record<ItemSlot, Item>>;
 
+/**
+ * Squad-wide effects accumulated from "permanent" blessing picks. Each is a
+ * running total rather than a boolean, so drawing the same blessing again
+ * on a later wave stacks rather than being wasted.
+ */
+export interface SquadModifiers {
+  /** Thorns: bonus damage on a player unit's counterattack. */
+  counterBonus: number;
+  /** Focus: skill cooldowns reduced by this many turns (floored at 1). */
+  cooldownReduction: number;
+  /** Mending: squad-wide HP regen at the start of each player phase. */
+  healPerTurn: number;
+  /** Ironclad: multiplies the terrain defence bonus for player units standing on it. */
+  terrainDefMultiplier: number;
+  /** Executioner: bonus damage a player unit deals to a target at or below half HP. */
+  executionerBonus: number;
+  /** Guardian Angel: charges granted at the start of each wave. */
+  guardianAngelMax: number;
+  /** Guardian Angel: charges remaining this wave. */
+  guardianAngelCharges: number;
+  /** Fortune: multiplies drop chance for the wave right after it's picked, then resets to 1. */
+  dropChanceMultiplier: number;
+}
+
 export interface Unit {
   id: string;
   name: string;
@@ -86,6 +110,12 @@ export interface GameState {
   inventory: Item[];
   /** Bumped on every drop so instance ids stay unique without a random source. */
   nextItemInstance: number;
+  /** Running totals from every "permanent" blessing picked so far this run. */
+  modifiers: SquadModifiers;
+  /** Player units that have died this run, kept around for The Fallen to revive. */
+  fallenUnits: Unit[];
+  /** The 3 blessing ids drawn for the current wave-clear pause; empty until the first one. */
+  offeredBlessingIds: string[];
 }
 
 /** boardgame.io player IDs mapped onto the two sides of a battle. */
