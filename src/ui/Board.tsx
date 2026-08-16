@@ -76,8 +76,14 @@ type CombatAnim = Record<
   {
     hp: number;
     shaking: boolean;
-    /** `kind` picks the color: red for damage, green for a heal. */
-    floatingNumber: { value: number; kind: 'damage' | 'heal' } | null;
+    /**
+     * `kind` picks the color: red for damage, green for a heal. `seq` is a
+     * per-beat nonce, not shown — it exists purely so the floating-number
+     * span's React key changes even when two consecutive beats deal the
+     * same value (e.g. Sword Dance's two equal hits), forcing a remount so
+     * the pop-in animation replays instead of being silently skipped.
+     */
+    floatingNumber: { value: number; kind: 'damage' | 'heal'; seq: number } | null;
   }
 >;
 
@@ -362,7 +368,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
               next[hit.unitId] = {
                 hp: hit.hp,
                 shaking: hit.shake ?? false,
-                floatingNumber: hit.floatingNumber ?? null,
+                floatingNumber: hit.floatingNumber ? { ...hit.floatingNumber, seq: i } : null,
               };
             }
             return next;
@@ -1282,7 +1288,7 @@ function UnitToken({
   /** Shown instead of unit.hp while a confirmed attack is animating. */
   hpOverride?: number;
   shaking?: boolean;
-  floatingNumber?: { value: number; kind: 'damage' | 'heal' } | null;
+  floatingNumber?: { value: number; kind: 'damage' | 'heal'; seq: number } | null;
 }) {
   const displayedHp = hpOverride ?? unit.hp;
   const hpRatio = Math.max(0, displayedHp) / unit.maxHp;
@@ -1330,7 +1336,7 @@ function UnitToken({
       </span>
       {floatingNumber != null && (
         <span
-          key={`${floatingNumber.kind}-${floatingNumber.value}`}
+          key={`${floatingNumber.kind}-${floatingNumber.seq}`}
           className={`we-unit__float-num we-unit__float-num--${floatingNumber.kind}`}
         >
           {floatingNumber.kind === 'heal' ? '+' : '-'}
