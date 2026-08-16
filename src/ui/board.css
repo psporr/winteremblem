@@ -872,6 +872,49 @@ body {
   color: var(--ink);
 }
 
+/* Purely decorative, so it never intercepts taps meant for the board
+   underneath — the game keeps running while this fades in and out. */
+.we-wave-banner {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+  pointer-events: none;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--ink);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+  animation: we-wave-banner 1800ms ease forwards;
+}
+
+@keyframes we-wave-banner {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.85);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  75% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .we-wave-banner {
+    animation: none;
+  }
+}
+
 .we-overlay {
   position: fixed;
   inset: 0;

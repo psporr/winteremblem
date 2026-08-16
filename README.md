@@ -68,7 +68,10 @@ A defender counterattacks if it survives and the attacker is within its own reac
 pick (a squad-wide +Atk, +Def, or full heal), then a new, tougher wave spawns
 and the squad resets to their start tiles. Fallen units stay fallen for the
 rest of the run; there's no separate permadeath toggle because a run only ever
-has one life. The run ends when the whole squad is wiped.
+has one life. The run ends when the whole squad is wiped. A "Wave N Starts"
+banner floats center-screen for a couple seconds at the start of every wave,
+including the first — purely decorative, the board stays fully interactive
+underneath.
 
 **Leveling.** Every attack grants EXP to whoever threw it, win or lose;
 reaching 100 EXP levels a unit up (atk/def/maxHp increase, and the unit heals

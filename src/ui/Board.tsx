@@ -99,6 +99,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   const [combatAnim, setCombatAnim] = useState<CombatAnim | null>(null);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [inventoryUnitId, setInventoryUnitId] = useState<string | null>(null);
+  const [waveBanner, setWaveBanner] = useState<number | null>(null);
 
   const isPlayerPhase =
     ctx.currentPlayer === PLAYER_ID.player && !ctx.gameover && !G.awaitingBlessing;
@@ -116,6 +117,15 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     setHoveredTargetId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx.currentPlayer]);
+
+  // A brief centered banner at the start of every wave, including the very
+  // first one on load. Purely a client-side toast — G.wave already drives
+  // the real state, this just announces the change.
+  useEffect(() => {
+    setWaveBanner(G.wave);
+    const timer = window.setTimeout(() => setWaveBanner(null), 1800);
+    return () => window.clearTimeout(timer);
+  }, [G.wave]);
 
   // Drive the CPU one action at a time; each dispatch mutates G and re-runs this.
   useEffect(() => {
@@ -747,6 +757,12 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
           onUnequip={(unitId, slot) => moves.unequipItem(unitId, slot)}
           onClose={() => setInventoryOpen(false)}
         />
+      )}
+
+      {waveBanner != null && (
+        <div key={waveBanner} className="we-wave-banner" aria-live="polite">
+          Wave {waveBanner} Starts
+        </div>
       )}
 
       {G.awaitingBlessing && !gameover && (
