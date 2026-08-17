@@ -37,6 +37,36 @@ const SFX_SOURCES: Record<SfxId, string> = {
   defeat: defeatUrl,
 };
 
+/**
+ * Per-cue trim, applied on top of the master volume.
+ *
+ * The source clips come from several packs and are mastered at wildly
+ * different levels — measured RMS across this set spans about 8x, so played
+ * raw the confirm blip would drown out a sword hit. Each value is
+ * `targetLoudness / measuredLoudness` for that clip, clamped so its peak
+ * can't be pushed past full scale. The targets themselves are a mix choice,
+ * not a flat normalisation: combat is meant to sit above the UI, and the
+ * cues that fire on every single tap are pulled well down so they don't
+ * become fatiguing.
+ */
+const SFX_GAIN: Record<SfxId, number> = {
+  // Combat, loudest — a crit should land harder than a normal swing.
+  crit: 1.04,
+  hit: 1.04,
+  defeat: 0.74,
+  heal: 0.6,
+  // Rewards: audible over combat without startling.
+  waveClear: 0.69,
+  levelUp: 0.84,
+  // Quiet source clip with plenty of headroom, so this one gets boosted.
+  drop: 3.13,
+  // UI, deliberately well under combat — these fire constantly.
+  click: 0.71,
+  confirm: 0.22,
+  cancel: 0.35,
+  turn: 0.32,
+};
+
 const MUTE_KEY = 'we-sfx-muted';
 const VOLUME_KEY = 'we-sfx-volume';
 const DEFAULT_VOLUME = 0.55;
@@ -174,7 +204,7 @@ class SoundManager {
     return pending;
   }
 
-  private start(buffer: AudioBuffer) {
+  private start(id: SfxId, buffer: AudioBuffer) {
     const ctx = this.ctx;
     const master = this.master;
     if (!ctx || !master) return;
@@ -182,7 +212,11 @@ class SoundManager {
     // Source nodes are one-shot: fire it and let it be collected.
     const source = ctx.createBufferSource();
     source.buffer = buffer;
-    source.connect(master);
+
+    const trim = ctx.createGain();
+    trim.gain.value = SFX_GAIN[id] ?? 1;
+    source.connect(trim).connect(master);
+
     source.start();
   }
 
@@ -198,14 +232,14 @@ class SoundManager {
 
     const buffer = this.buffers.get(id);
     if (buffer) {
-      this.start(buffer);
+      this.start(id, buffer);
       return;
     }
 
     // Only reachable for the first cue of the session, before decoding
     // finished. Re-checks mute in case it was toggled while decoding.
     void this.decode(id, ctx).then((decoded) => {
-      if (decoded && !this.muted) this.start(decoded);
+      if (decoded && !this.muted) this.start(id, decoded);
     });
   }
 
