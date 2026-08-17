@@ -1288,3 +1288,184 @@ body {
   color: var(--ink-dim);
   font-size: 12px;
 }
+
+/* ---------------------------------------------------------------------------
+   Phase banner — a full-width sweep across the board announcing whose turn
+   it is, in the Fire Emblem tradition. Anchored to .we-board so it spans the
+   tile grid rather than the whole viewport, and non-interactive so it can
+   never swallow a tap on the board underneath.
+   --------------------------------------------------------------------------- */
+.we-phase-banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  z-index: 21;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 0;
+  transform: translateY(-50%);
+  animation: we-phase-banner 1300ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+/* The band itself is a separate pseudo-element so the text can slide across
+   it independently, which is what gives the sweep its sense of motion. */
+.we-phase-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-block: 2px solid currentColor;
+  background: linear-gradient(90deg, transparent, rgba(8, 12, 20, 0.92) 18%, rgba(8, 12, 20, 0.92) 82%, transparent);
+}
+
+.we-phase-banner--player {
+  color: #6ea8fe;
+}
+
+.we-phase-banner--enemy {
+  color: #f0616d;
+}
+
+.we-phase-banner__text {
+  position: relative;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: currentColor;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+  animation: we-phase-banner-text 1300ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+@keyframes we-phase-banner {
+  0% {
+    opacity: 0;
+  }
+  12%,
+  72% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Text enters from the left and keeps drifting right as it leaves, so the
+   banner reads as sweeping past rather than simply fading. */
+@keyframes we-phase-banner-text {
+  0% {
+    transform: translateX(-40%);
+  }
+  12%,
+  72% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(40%);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Announcement popups (level-up, loot)
+   --------------------------------------------------------------------------- */
+
+/* A level-up card is informational and dismisses itself, so its backdrop
+   stays light and lets the board keep reading through it. */
+.we-overlay--passive {
+  background: rgba(6, 10, 17, 0.45);
+}
+
+.we-popup {
+  animation: we-popup-in 260ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.we-popup--levelup {
+  cursor: pointer;
+  border-color: #ffd479;
+  box-shadow: 0 0 0 1px rgba(255, 212, 121, 0.35), 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+.we-popup__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+}
+
+/* The sprite keeps its idle animation here — it's the same element the board
+   uses, just parked in a fixed-size box. */
+.we-popup__portrait {
+  flex-shrink: 0;
+}
+
+.we-popup__eyebrow {
+  margin: 0 0 2px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #ffd479;
+}
+
+.we-popup__title {
+  margin: 0;
+  font-size: 22px;
+}
+
+.we-popup__sub {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+.we-popup__stats {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.we-popup__stat {
+  flex: 1;
+  padding: 8px 4px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--panel-edge);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--ink-dim);
+}
+
+.we-popup__stat strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 18px;
+  color: #4ad991;
+}
+
+.we-popup--loot .we-popup__title {
+  margin-bottom: 6px;
+}
+
+@keyframes we-popup-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .we-phase-banner,
+  .we-phase-banner__text,
+  .we-popup {
+    animation-duration: 1ms;
+  }
+}

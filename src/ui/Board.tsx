@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { BoardProps } from 'boardgame.io/react';
 
-import type { GameState, TerrainType, Unit } from '../game/types';
-import { PLAYER_ID } from '../game/types';
+import type { GameState, Team, TerrainType, Unit } from '../game/types';
+import { PLAYER_ID, teamOf } from '../game/types';
 import terrainTileset from '../assets/terrain/toen-terrain.png';
 import { UNIT_SPRITES, SPRITE_DISPLAY_HEIGHT } from './unitSprites';
 import { ParticleLayer, type ParticleBurstHandle } from './ParticleLayer';
@@ -21,7 +21,7 @@ import {
 import { canCounter, computeCounterDamage, computeDamage, forecastCombat, type CombatForecast } from '../game/combat';
 import { decideEnemyAction } from '../game/ai';
 import { BLESSINGS } from '../game/blessings';
-import { EXP_TO_LEVEL } from '../game/classes';
+import { EXP_TO_LEVEL, LEVEL_GROWTH, type ClassName } from '../game/classes';
 import { effectiveStats, ITEMS } from '../game/equipment';
 import {
   HEAL_BONUS,
@@ -97,6 +97,21 @@ type CombatAnim = Record<
   }
 >;
 
+/**
+ * A queued announcement. Several can be produced by one action — a killing
+ * blow can level the attacker *and* drop loot — so they're shown one at a
+ * time rather than stacked on top of each other.
+ */
+type Popup =
+  | { kind: 'levelUp'; unitName: string; className: ClassName; level: number; levelsGained: number }
+  | { kind: 'loot'; itemNames: string[] };
+
+/** How long a level-up card stays up before dismissing itself. */
+const LEVEL_UP_POPUP_MS = 2600;
+
+/** How long the "Player Phase" / "Enemy Phase" banner sweeps for. */
+const PHASE_BANNER_MS = 1300;
+
 /** One unit's HP update within a single simultaneous beat. */
 interface BeatHit {
   unitId: string;
@@ -115,6 +130,10 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [inventoryUnitId, setInventoryUnitId] = useState<string | null>(null);
   const [waveBanner, setWaveBanner] = useState<number | null>(null);
+  /** Announcements waiting to be shown, oldest first. */
+  const [popupQueue, setPopupQueue] = useState<Popup[]>([]);
+  /** `seq` re-keys the element so the sweep replays on back-to-back phases. */
+  const [phaseBanner, setPhaseBanner] = useState<{ team: Team; seq: number } | null>(null);
   /** The unit currently leaning toward whoever it's striking this beat, and how far. */
   const [lunge, setLunge] = useState<{ unitId: string; dx: number; dy: number } | null>(null);
   const particlesRef = useRef<ParticleBurstHandle | null>(null);
@@ -145,12 +164,20 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   // couple of renders, so "not the first render" isn't the same as "not the
   // initial battle load" — only a genuine enemy-to-player handoff should cue.
   const prevPlayerRef = useRef<string | null>(null);
+  const phaseSeqRef = useRef(0);
   useEffect(() => {
     const prevPlayer = prevPlayerRef.current;
     prevPlayerRef.current = ctx.currentPlayer;
-    if (prevPlayer === PLAYER_ID.enemy && ctx.currentPlayer === PLAYER_ID.player && !ctx.gameover) {
-      sound.play('turn');
-    }
+    // Only a genuine handoff announces itself. The opening player phase is
+    // skipped deliberately: the wave/objective banner already covers battle
+    // start, and two banners at once would collide.
+    if (prevPlayer === null || prevPlayer === ctx.currentPlayer || ctx.gameover) return;
+
+    if (ctx.currentPlayer === PLAYER_ID.player) sound.play('turn');
+    phaseSeqRef.current += 1;
+    setPhaseBanner({ team: teamOf(ctx.currentPlayer), seq: phaseSeqRef.current });
+    const timer = window.setTimeout(() => setPhaseBanner(null), PHASE_BANNER_MS);
+    return () => window.clearTimeout(timer);
   }, [ctx.currentPlayer, ctx.gameover]);
 
   // A brief centered banner at the start of every wave, including the very
@@ -163,37 +190,72 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   }, [G.wave]);
 
   /**
-   * Cues level-up, loot, and wave-clear off the state they produce rather
-   * than the moves that cause them, since each can fire mid-combo (Nova
-   * killing several enemies at once) or during the CPU's turn. Watching
-   * state also sidesteps the battle log, which is capped at a fixed length —
-   * once it's full its length stops growing, so any "did the log get longer"
-   * check silently stops firing a couple of waves in.
+   * Level-ups and loot are detected from the state they produce rather than
+   * the moves that cause them, since each can fire mid-combo (Nova killing
+   * several enemies at once) or during the CPU's turn. Watching state also
+   * sidesteps the battle log, which is capped at a fixed length — once full
+   * its length stops growing, so any "did the log get longer" check silently
+   * stops firing a couple of waves in.
+   *
+   * Sound cues fire the instant the event happens; the matching popup is
+   * queued and may surface later (see `visiblePopup`).
    */
-  const playerLevelTotal = useMemo(
-    () => unitsOf(G, 'player').reduce((sum, unit) => sum + unit.level, 0),
-    [G],
-  );
-  const prevCuesRef = useRef({
-    levels: playerLevelTotal,
-    loot: G.inventory.length,
-    awaitingBlessing: G.awaitingBlessing,
-  });
+  const playerLevels = useMemo(() => {
+    const levels: Record<string, number> = {};
+    for (const unit of unitsOf(G, 'player')) levels[unit.id] = unit.level;
+    return levels;
+  }, [G]);
 
+  // Seeded null so the first pass only records a baseline — loading into a
+  // battle must not announce every unit's starting level as a level-up.
+  const prevLevelsRef = useRef<Record<string, number> | null>(null);
   useEffect(() => {
-    const prev = prevCuesRef.current;
-    prevCuesRef.current = {
-      levels: playerLevelTotal,
-      loot: G.inventory.length,
-      awaitingBlessing: G.awaitingBlessing,
-    };
+    const prev = prevLevelsRef.current;
+    prevLevelsRef.current = playerLevels;
+    if (!prev) return;
 
-    // Only ever cue on an increase: the squad's level total also drops when a
-    // unit dies, and inventory shrinks whenever something is equipped.
-    if (playerLevelTotal > prev.levels) sound.play('levelUp');
-    if (G.inventory.length > prev.loot) sound.play('drop');
-    if (G.awaitingBlessing && !prev.awaitingBlessing) sound.play('waveClear');
-  }, [playerLevelTotal, G.inventory.length, G.awaitingBlessing]);
+    const leveled: Popup[] = [];
+    for (const [unitId, level] of Object.entries(playerLevels)) {
+      const before = prev[unitId];
+      // `undefined` means the unit wasn't there last pass (a revive), which
+      // isn't a level-up.
+      if (before === undefined || level <= before) continue;
+      const unit = G.units[unitId];
+      if (!unit) continue;
+      leveled.push({
+        kind: 'levelUp',
+        unitName: unit.name,
+        className: unit.className,
+        level,
+        levelsGained: level - before,
+      });
+    }
+
+    if (leveled.length > 0) {
+      sound.play('levelUp');
+      setPopupQueue((queue) => [...queue, ...leveled]);
+    }
+  }, [playerLevels, G.units]);
+
+  const prevInventoryLenRef = useRef<number | null>(null);
+  useEffect(() => {
+    const prev = prevInventoryLenRef.current;
+    prevInventoryLenRef.current = G.inventory.length;
+    if (prev === null || G.inventory.length <= prev) return;
+
+    // Drops are appended, so anything past the old length is new. Equipping
+    // shrinks the list, which is why only growth counts here.
+    const gained = G.inventory.slice(prev).map((item) => ITEMS[item.defId]?.name ?? 'an item');
+    sound.play('drop');
+    setPopupQueue((queue) => [...queue, { kind: 'loot', itemNames: gained }]);
+  }, [G.inventory]);
+
+  const prevAwaitingBlessingRef = useRef(G.awaitingBlessing);
+  useEffect(() => {
+    const prev = prevAwaitingBlessingRef.current;
+    prevAwaitingBlessingRef.current = G.awaitingBlessing;
+    if (G.awaitingBlessing && !prev) sound.play('waveClear');
+  }, [G.awaitingBlessing]);
 
   // Drive the CPU one action at a time; each dispatch mutates G and re-runs this.
   useEffect(() => {
@@ -724,6 +786,36 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
 
   const gameover = ctx.gameover as GameOver | undefined;
 
+  /**
+   * Announcements are held back until the player is actually in control.
+   * A drop or level-up can land during the enemy phase (a counterattack
+   * killing its attacker), and interrupting the CPU mid-turn would both read
+   * as a bug and offer an "Open equipment" button that goes nowhere, since
+   * the inventory only opens on the player's own phase. Queued cards simply
+   * surface the moment the phase flips back.
+   */
+  const popupsReady = isPlayerPhase && !G.awaitingBlessing && !gameover && mode !== 'animating';
+  const visiblePopup = popupsReady ? (popupQueue[0] ?? null) : null;
+
+  function dismissPopup() {
+    setPopupQueue((queue) => queue.slice(1));
+  }
+
+  // Level-up cards read themselves out and go; loot cards wait for a choice.
+  useEffect(() => {
+    if (visiblePopup?.kind !== 'levelUp') return;
+    const timer = window.setTimeout(dismissPopup, LEVEL_UP_POPUP_MS);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visiblePopup]);
+
+  function handlePopupOpenEquipment() {
+    sound.play('confirm');
+    setInventoryUnitId((current) => current ?? selectedId ?? unitsOf(G, 'player')[0]?.id ?? null);
+    setInventoryOpen(true);
+    dismissPopup();
+  }
+
   return (
     <div className="we-app">
       <header className="we-header">
@@ -973,6 +1065,18 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 {G.mode === 'campaign' ? G.objective : `Wave ${waveBanner} Starts`}
               </div>
             )}
+
+            {phaseBanner && (
+              <div
+                key={phaseBanner.seq}
+                className={`we-phase-banner we-phase-banner--${phaseBanner.team}`}
+                aria-live="polite"
+              >
+                <span className="we-phase-banner__text">
+                  {phaseBanner.team === 'player' ? 'Player Phase' : 'Enemy Phase'}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1004,6 +1108,17 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
             sound.play('cancel');
             setInventoryOpen(false);
           }}
+        />
+      )}
+
+      {visiblePopup && !inventoryOpen && (
+        <AnnouncementPopup
+          popup={visiblePopup}
+          onDismiss={() => {
+            sound.play('confirm');
+            dismissPopup();
+          }}
+          onOpenEquipment={handlePopupOpenEquipment}
         />
       )}
 
@@ -1567,6 +1682,90 @@ function UnitToken({
           {floatingNumber.value}
         </span>
       )}
+    </div>
+  );
+}
+
+/**
+ * The queued announcement card. A level-up is informational and clears
+ * itself on a timer; loot asks a question, so it stays until answered.
+ */
+function AnnouncementPopup({
+  popup,
+  onDismiss,
+  onOpenEquipment,
+}: {
+  popup: Popup;
+  onDismiss: () => void;
+  onOpenEquipment: () => void;
+}) {
+  if (popup.kind === 'levelUp') {
+    // Growth is flat per level, so a multi-level gain just multiplies it.
+    const gain = (per: number) => per * popup.levelsGained;
+    const sprite = UNIT_SPRITES[popup.className];
+
+    return (
+      <div className="we-overlay we-overlay--passive">
+        <div className="we-overlay__card we-popup we-popup--levelup" role="status" onClick={onDismiss}>
+          <div className="we-popup__head">
+            {sprite && (
+              <span
+                className="we-unit__sprite we-popup__portrait"
+                style={
+                  {
+                    '--frame-w': `${sprite.frameWidth}px`,
+                    '--frame-h': `${sprite.frameHeight}px`,
+                    '--frame-count': sprite.frames,
+                    '--sprite-src': `url(${sprite.src})`,
+                    '--sprite-scale': SPRITE_DISPLAY_HEIGHT / sprite.frameHeight,
+                  } as CSSProperties
+                }
+              />
+            )}
+            <div>
+              <p className="we-popup__eyebrow">Level Up</p>
+              <h2 className="we-popup__title">{popup.unitName}</h2>
+              <p className="we-popup__sub">
+                {popup.className} &middot; Lv. {popup.level}
+                {popup.levelsGained > 1 ? ` (+${popup.levelsGained})` : ''}
+              </p>
+            </div>
+          </div>
+
+          <div className="we-popup__stats">
+            <span className="we-popup__stat">
+              HP <strong>+{gain(LEVEL_GROWTH.maxHp)}</strong>
+            </span>
+            <span className="we-popup__stat">
+              ATK <strong>+{gain(LEVEL_GROWTH.atk)}</strong>
+            </span>
+            <span className="we-popup__stat">
+              DEF <strong>+{gain(LEVEL_GROWTH.def)}</strong>
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const multiple = popup.itemNames.length > 1;
+  return (
+    <div className="we-overlay">
+      <div className="we-overlay__card we-popup we-popup--loot" role="dialog" aria-modal="true">
+        <p className="we-popup__eyebrow">{multiple ? 'Items found' : 'Item found'}</p>
+        <h2 className="we-popup__title">{popup.itemNames.join(', ')}</h2>
+        <p className="we-popup__sub">
+          Added to your inventory. Equip it now, or carry on and sort your gear later.
+        </p>
+        <div className="we-overlay__actions">
+          <button type="button" className="we-button" onClick={onOpenEquipment}>
+            Open equipment
+          </button>
+          <button type="button" className="we-button we-button--ghost" onClick={onDismiss}>
+            Continue
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

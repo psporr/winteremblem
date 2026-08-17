@@ -52,8 +52,12 @@ export const ALL_CLASSES: ClassName[] = [
   'Dancer',
 ];
 
-/** Flat stat gain per level above 1 — the same curve for every class. */
-const LEVEL_GROWTH = { atk: 1, def: 1, maxHp: 2 };
+/**
+ * Flat stat gain per level above 1 — the same curve for every class.
+ * Exported so the level-up card can report the real gains rather than
+ * repeating these numbers in the UI.
+ */
+export const LEVEL_GROWTH = { atk: 1, def: 1, maxHp: 2 };
 
 /** The player squad starts stronger than a fresh wave-1 recruit. */
 export const PLAYER_START_LEVEL = 5;
