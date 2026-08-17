@@ -37,67 +37,161 @@ const SFX_SOURCES: Record<SfxId, string> = {
   defeat: defeatUrl,
 };
 
-/** Overlapping instances of one sound that can play at once — Sword Dance's two hits land close enough together to need this. */
-const POOL_SIZE = 3;
-
 const MUTE_KEY = 'we-sfx-muted';
 const VOLUME_KEY = 'we-sfx-volume';
 const DEFAULT_VOLUME = 0.55;
 
 /**
- * A tiny pooled SFX player, not a general audio engine — this game has no
- * music yet, just short one-shot cues. Each sound gets a small round-robin
- * pool of <audio> elements rather than one shared element, since a single
- * element can't play two overlapping instances of the same clip (replaying
- * it mid-flight just restarts the one that's already playing).
+ * Minimum gap before the same cue can retrigger. Nova hits up to five tiles
+ * in a single beat, which would otherwise start five identical clips at the
+ * same instant — they'd sum to five times the amplitude and clip harshly,
+ * rather than sounding like one bigger hit.
+ */
+const RETRIGGER_MS = 40;
+
+type AudioContextCtor = typeof AudioContext;
+
+function audioContextCtor(): AudioContextCtor | null {
+  if (typeof window === 'undefined') return null;
+  const w = window as unknown as { AudioContext?: AudioContextCtor; webkitAudioContext?: AudioContextCtor };
+  return w.AudioContext ?? w.webkitAudioContext ?? null;
+}
+
+/**
+ * Web Audio one-shot SFX player.
  *
- * Guarded against `Audio` not existing at all: scripts/simulate.ts imports
- * only src/game/*, never this module, but the guard is cheap insurance
- * against a future import from a non-browser context (Node has no Audio).
+ * Deliberately *not* built on <audio> elements. Those are streaming media
+ * elements: each one carries its own decode pipeline, `play()` has tens of
+ * milliseconds of startup latency, and rewinding with `currentTime = 0`
+ * forces a seek on the main thread. A pool of them big enough to overlap
+ * cues stalls the main thread badly enough to delay the `setTimeout`s that
+ * drive combat beats, which then fire in a catch-up burst and make the
+ * animation look fast-forwarded.
+ *
+ * Web Audio avoids all of it: every clip is decoded once into an
+ * AudioBuffer, and each play spins up a throwaway AudioBufferSourceNode
+ * that's scheduled on the audio thread. Source nodes are single-use by
+ * design and cheap to create, so overlapping cues need no pooling at all.
  */
 class SoundManager {
-  private pools: Partial<Record<SfxId, HTMLAudioElement[]>> = {};
-  private cursors: Partial<Record<SfxId, number>> = {};
+  private ctx: AudioContext | null = null;
+  private master: GainNode | null = null;
+  /** Decoded and ready to play. */
+  private buffers = new Map<SfxId, AudioBuffer>();
+  /** Raw undecoded bytes, fetched before any AudioContext exists. */
+  private encoded = new Map<SfxId, Promise<ArrayBuffer | null>>();
+  /** In-flight decodes, so a cue requested twice before it's ready decodes once. */
+  private decoding = new Map<SfxId, Promise<AudioBuffer | null>>();
+  private lastPlayedAt = new Map<SfxId, number>();
   private muted: boolean;
   private volume: number;
-  private readonly supported = typeof Audio !== 'undefined';
+  private readonly supported: boolean;
 
   constructor() {
+    this.supported = audioContextCtor() !== null;
+
     this.muted = this.supported && localStorage.getItem(MUTE_KEY) === '1';
     const stored = this.supported ? Number(localStorage.getItem(VOLUME_KEY)) : NaN;
     this.volume = Number.isFinite(stored) && stored >= 0 && stored <= 1 ? stored : DEFAULT_VOLUME;
 
-    if (!this.supported) return;
-
-    for (const id of Object.keys(SFX_SOURCES) as SfxId[]) {
-      const src = SFX_SOURCES[id];
-      const pool: HTMLAudioElement[] = [];
-      for (let i = 0; i < POOL_SIZE; i += 1) {
-        const audio = new Audio(src);
-        audio.preload = 'auto';
-        audio.volume = this.volume;
-        pool.push(audio);
+    // Fetching needs no AudioContext and no user gesture, so the bytes are
+    // already in hand by the time the first click creates one.
+    if (this.supported) {
+      for (const id of Object.keys(SFX_SOURCES) as SfxId[]) {
+        this.encoded.set(
+          id,
+          fetch(SFX_SOURCES[id])
+            .then((response) => (response.ok ? response.arrayBuffer() : null))
+            .catch(() => null),
+        );
       }
-      this.pools[id] = pool;
-      this.cursors[id] = 0;
     }
+  }
+
+  /**
+   * Creates the context on first use rather than at construction: Safari
+   * only reliably starts a context created during a user gesture, and every
+   * caller of `play` is downstream of a click.
+   */
+  private ensureContext(): AudioContext | null {
+    if (!this.supported) return null;
+
+    if (this.ctx) {
+      // Browsers suspend the context when a tab is backgrounded.
+      if (this.ctx.state === 'suspended') void this.ctx.resume();
+      return this.ctx;
+    }
+
+    const Ctor = audioContextCtor();
+    if (!Ctor) return null;
+
+    const ctx = new Ctor();
+    this.ctx = ctx;
+    this.master = ctx.createGain();
+    this.master.gain.value = this.muted ? 0 : this.volume;
+    this.master.connect(ctx.destination);
+
+    // Decode everything up front now that a context exists, so only the very
+    // first cue can ever wait on a decode.
+    for (const id of Object.keys(SFX_SOURCES) as SfxId[]) void this.decode(id, ctx);
+
+    return ctx;
+  }
+
+  private decode(id: SfxId, ctx: AudioContext): Promise<AudioBuffer | null> {
+    const inFlight = this.decoding.get(id);
+    if (inFlight) return inFlight;
+
+    const pending = (this.encoded.get(id) ?? Promise.resolve(null))
+      .then((data) => {
+        if (!data || data.byteLength === 0) return null;
+        // Sliced because decodeAudioData detaches the buffer it's given, and
+        // the original is the only copy we hold.
+        return ctx.decodeAudioData(data.slice(0));
+      })
+      .then((buffer) => {
+        if (buffer) this.buffers.set(id, buffer);
+        return buffer;
+      })
+      .catch(() => null);
+
+    this.decoding.set(id, pending);
+    return pending;
+  }
+
+  private start(buffer: AudioBuffer) {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+
+    // Source nodes are one-shot: fire it and let it be collected.
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(master);
+    source.start();
   }
 
   play(id: SfxId) {
     if (!this.supported || this.muted) return;
-    const pool = this.pools[id];
-    if (!pool) return;
 
-    const cursor = this.cursors[id] ?? 0;
-    const audio = pool[cursor];
-    this.cursors[id] = (cursor + 1) % pool.length;
+    const now = performance.now();
+    if (now - (this.lastPlayedAt.get(id) ?? Number.NEGATIVE_INFINITY) < RETRIGGER_MS) return;
+    this.lastPlayedAt.set(id, now);
 
-    audio.currentTime = 0;
-    audio.volume = this.volume;
-    // Rejected until the first user gesture (browser autoplay policy) — not
-    // an error, just means nothing plays before the player has clicked
-    // anything, which is always true well before combat starts.
-    void audio.play().catch(() => {});
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+
+    const buffer = this.buffers.get(id);
+    if (buffer) {
+      this.start(buffer);
+      return;
+    }
+
+    // Only reachable for the first cue of the session, before decoding
+    // finished. Re-checks mute in case it was toggled while decoding.
+    void this.decode(id, ctx).then((decoded) => {
+      if (decoded && !this.muted) this.start(decoded);
+    });
   }
 
   isMuted() {
@@ -107,6 +201,7 @@ class SoundManager {
   setMuted(muted: boolean) {
     this.muted = muted;
     if (this.supported) localStorage.setItem(MUTE_KEY, muted ? '1' : '0');
+    if (this.master) this.master.gain.value = muted ? 0 : this.volume;
   }
 
   getVolume() {
@@ -116,9 +211,7 @@ class SoundManager {
   setVolume(volume: number) {
     this.volume = Math.max(0, Math.min(1, volume));
     if (this.supported) localStorage.setItem(VOLUME_KEY, String(this.volume));
-    for (const pool of Object.values(this.pools)) {
-      for (const audio of pool ?? []) audio.volume = this.volume;
-    }
+    if (this.master) this.master.gain.value = this.muted ? 0 : this.volume;
   }
 }
 

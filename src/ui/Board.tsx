@@ -163,34 +163,37 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   }, [G.wave]);
 
   /**
-   * Cues level-up, loot, and wave-clear off the battle log instead of the
-   * moves that cause them — those events can happen mid-combo (Nova killing
-   * several enemies at once) or from the CPU's own turn, so hanging a sound
-   * on the log is simpler than threading one through every code path that
-   * can produce one. `pushLog` always unshifts, so whatever's new is exactly
-   * the front slice the previous length doesn't cover; a shrinking or
-   * unchanged log (a fresh battle, a retry) is treated as "nothing to cue".
+   * Cues level-up, loot, and wave-clear off the state they produce rather
+   * than the moves that cause them, since each can fire mid-combo (Nova
+   * killing several enemies at once) or during the CPU's turn. Watching
+   * state also sidesteps the battle log, which is capped at a fixed length —
+   * once it's full its length stops growing, so any "did the log get longer"
+   * check silently stops firing a couple of waves in.
    */
-  const prevLogLenRef = useRef(G.log.length);
-  useEffect(() => {
-    const prevLen = prevLogLenRef.current;
-    prevLogLenRef.current = G.log.length;
-    if (G.log.length <= prevLen) return;
+  const playerLevelTotal = useMemo(
+    () => unitsOf(G, 'player').reduce((sum, unit) => sum + unit.level, 0),
+    [G],
+  );
+  const prevCuesRef = useRef({
+    levels: playerLevelTotal,
+    loot: G.inventory.length,
+    awaitingBlessing: G.awaitingBlessing,
+  });
 
-    for (const entry of G.log.slice(0, G.log.length - prevLen)) {
-      const levelUp = entry.match(/^(.+) reached level \d+!$/);
-      if (levelUp) {
-        // Enemies level up too; only the player's own squad gets the fanfare.
-        if (Object.values(G.units).some((u) => u.name === levelUp[1] && u.team === 'player')) {
-          sound.play('levelUp');
-        }
-      } else if (entry.includes(' dropped ')) {
-        sound.play('drop');
-      } else if (entry.includes('Choose your blessing')) {
-        sound.play('waveClear');
-      }
-    }
-  }, [G.log, G.units]);
+  useEffect(() => {
+    const prev = prevCuesRef.current;
+    prevCuesRef.current = {
+      levels: playerLevelTotal,
+      loot: G.inventory.length,
+      awaitingBlessing: G.awaitingBlessing,
+    };
+
+    // Only ever cue on an increase: the squad's level total also drops when a
+    // unit dies, and inventory shrinks whenever something is equipped.
+    if (playerLevelTotal > prev.levels) sound.play('levelUp');
+    if (G.inventory.length > prev.loot) sound.play('drop');
+    if (G.awaitingBlessing && !prev.awaitingBlessing) sound.play('waveClear');
+  }, [playerLevelTotal, G.inventory.length, G.awaitingBlessing]);
 
   // Drive the CPU one action at a time; each dispatch mutates G and re-runs this.
   useEffect(() => {
