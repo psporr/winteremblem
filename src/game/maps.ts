@@ -97,7 +97,11 @@ export function buildGameState(chapter: ChapterDef, mode: GameMode, random: Shuf
 
     units[spec.id] = {
       id: spec.id,
-      name: spec.name,
+      // Enemies are anonymous rank-and-file, so their display name is always
+      // derived from class rather than authored per spec — matches the
+      // convention spawnWave uses for later roguelike waves. Player units
+      // keep their authored name.
+      name: spec.team === 'enemy' ? `${className} Shadow` : spec.name,
       team: spec.team,
       className,
       x: spec.x,

@@ -52,7 +52,7 @@ export function spawnWave(G: GameState, wave: number, random: ShuffleAPI): void 
 
     const unit: Unit = {
       id,
-      name: `Bandit ${i + 1}`,
+      name: `${className} Shadow`,
       team: 'enemy',
       className,
       x: pool[i].x,

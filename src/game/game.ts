@@ -125,7 +125,9 @@ function resolveSkillCounter(G: GameState, attacker: Unit, target: Unit, random:
   return true;
 }
 
+/** Only the player squad grows — enemy stats are fixed by wave/chapter, not combat performance. */
 function grantExp(G: GameState, unit: Unit): void {
+  if (unit.team !== 'player') return;
   grantExpToUnit(unit, EXP_PER_ATTACK, (leveled) => pushLog(G, `${leveled.name} reached level ${leveled.level}!`));
 }
 
