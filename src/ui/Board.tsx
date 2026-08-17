@@ -1780,14 +1780,14 @@ function UnitToken({
       <span className={artClasses.join(' ')}>
         {sprite ? (
           <span
-            className="we-unit__sprite"
+            className="we-unit__sprite we-unit__sprite--board"
             style={
               {
-                '--frame-w': `${sprite.frameWidth}px`,
-                '--frame-h': `${sprite.frameHeight}px`,
                 '--frame-count': sprite.frames,
                 '--sprite-src': `url(${sprite.src})`,
-                '--sprite-scale': SPRITE_DISPLAY_HEIGHT / sprite.frameHeight,
+                // Board art sizes off --tile (see .we-unit__sprite--board), so
+                // it needs the sheet's shape rather than a fixed pixel height.
+                '--sprite-aspect': sprite.frameWidth / sprite.frameHeight,
               } as CSSProperties
             }
           />

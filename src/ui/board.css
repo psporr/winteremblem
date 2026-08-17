@@ -10,6 +10,10 @@
   --tile: clamp(40px, calc((100vw - 68px) / var(--board-cols, 7)), 64px);
   --tile-gap: 2px;
   --board-pad: 8px;
+  /* Unit art height as a multiple of the tile. Slightly over 1 so sprites
+     overhang their tile a little, the way they did at the original fixed
+     48px against a ~46px tile. */
+  --sprite-tile-ratio: 1.05;
   --ink: #e8eef6;
   --ink-dim: #93a4bb;
   --bg: #0d1420;
@@ -428,16 +432,35 @@ body {
   line-height: 1;
 }
 
+/* Rendered size is funnelled through --sprite-w/--sprite-h so the two
+   contexts can size differently while sharing every other rule (and the
+   keyframe, which needs the frame stride in px). The default here is the
+   fixed portrait size used by UI panels. */
 .we-unit__sprite {
-  width: calc(var(--frame-w) * var(--sprite-scale));
-  height: calc(var(--frame-h) * var(--sprite-scale));
+  --sprite-w: calc(var(--frame-w) * var(--sprite-scale));
+  --sprite-h: calc(var(--frame-h) * var(--sprite-scale));
+
+  width: var(--sprite-w);
+  height: var(--sprite-h);
+  /* .we-unit__art is a flex row exactly one tile wide, so without this the
+     sprite is shrunk to fit and loses the right edge of every frame — the
+     art is meant to overhang the tile slightly, which the parent's
+     overflow: visible already allows. */
+  flex-shrink: 0;
   background-image: var(--sprite-src);
   background-repeat: no-repeat;
-  background-size:
-    calc(var(--frame-w) * var(--frame-count) * var(--sprite-scale))
-    calc(var(--frame-h) * var(--sprite-scale));
+  background-size: calc(var(--sprite-w) * var(--frame-count)) var(--sprite-h);
   image-rendering: pixelated;
   animation: we-sprite-cycle 0.9s steps(var(--frame-count)) infinite;
+}
+
+/* On the board, art is sized from --tile instead of a fixed pixel height, so
+   zooming resizes units along with the terrain under them. UI portraits
+   deliberately keep the fixed size above — panel chrome shouldn't grow and
+   shrink with board zoom. */
+.we-unit__sprite--board {
+  --sprite-h: calc(var(--tile) * var(--sprite-tile-ratio));
+  --sprite-w: calc(var(--sprite-h) * var(--sprite-aspect, 1));
 }
 
 @keyframes we-sprite-cycle {
@@ -445,7 +468,7 @@ body {
     background-position: 0 0;
   }
   to {
-    background-position: calc(var(--frame-w) * var(--frame-count) * var(--sprite-scale) * -1) 0;
+    background-position: calc(var(--sprite-w) * var(--frame-count) * -1) 0;
   }
 }
 
