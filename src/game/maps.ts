@@ -242,3 +242,57 @@ export const CAMPAIGN_CHAPTER_1: ChapterDef = {
 
 /** Every chapter the campaign can load, in play order. */
 export const CAMPAIGN_CHAPTERS: ChapterDef[] = [CAMPAIGN_CHAPTER_1];
+
+/**
+ * A deliberately oversized 14x18 map, used only by the zoom demo screen.
+ * Nothing in the campaign or roguelike flow references it — its whole job is
+ * to be far too big to fit a phone screen, so the board's zoom and panning
+ * can be judged against a map the current 7x8 grid never stresses.
+ *
+ * Player units start bottom-left; enemies hold the top and the far right, so
+ * reaching them actually requires crossing the map rather than trading blows
+ * on turn one. Terrain is laid out as two forest belts and a broken wall line
+ * so there are real chokepoints at this scale.
+ */
+export const LARGE_MAP_DEMO: ChapterDef = {
+  id: 'wide-vale',
+  name: 'The Wide Vale (zoom demo)',
+  shortName: 'Wide Vale',
+  objective: 'Survive as many waves as you can',
+  objectiveType: 'waves',
+  rows: [
+    '..##......##..',
+    '..............',
+    '.ff......ff...',
+    '.ff......ff...',
+    '..............',
+    '....######....',
+    '..............',
+    '...ff....ff...',
+    '...ff....ff...',
+    '..............',
+    '..######......',
+    '..............',
+    '.ff.......ff..',
+    '.ff.......ff..',
+    '..............',
+    '....####......',
+    '..............',
+    '..##......##..',
+  ],
+  units: [
+    { id: 'lyn', name: 'Lyn', team: 'player', className: 'Swordsman', x: 1, y: 16 },
+    { id: 'ake', name: 'Ake', team: 'player', className: 'Barbarian', x: 2, y: 16 },
+    { id: 'lissa', name: 'Lissa', team: 'player', className: 'Cleric', x: 3, y: 16 },
+    { id: 'corrin', name: 'Corrin', team: 'player', className: 'Lancer', x: 4, y: 16 },
+    { id: 'olivia', name: 'Olivia', team: 'player', className: 'Dancer', x: 5, y: 16 },
+    { id: 'byleth', name: 'Byleth', team: 'player', className: 'Archer', x: 1, y: 17 },
+    { id: 'selva', name: 'Selva', team: 'player', className: 'Mage', x: 4, y: 17 },
+    { id: 'vale-1', name: 'Vale Raider', team: 'enemy', randomClass: true, x: 1, y: 1 },
+    { id: 'vale-2', name: 'Vale Raider', team: 'enemy', randomClass: true, x: 5, y: 0 },
+    { id: 'vale-3', name: 'Vale Raider', team: 'enemy', randomClass: true, x: 8, y: 1 },
+    { id: 'vale-4', name: 'Vale Raider', team: 'enemy', randomClass: true, x: 12, y: 0 },
+    { id: 'vale-5', name: 'Vale Raider', team: 'enemy', randomClass: true, x: 12, y: 6 },
+    { id: 'vale-6', name: 'Vale Raider', team: 'enemy', randomClass: true, x: 11, y: 11 },
+  ],
+};

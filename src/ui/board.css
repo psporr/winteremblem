@@ -1,10 +1,13 @@
 :root {
   /* Fills the viewport width on mobile rather than sitting at a fixed size:
      100vw minus .we-app's horizontal padding (40px), .we-board's own padding
-     (16px), and the 6 inter-tile gaps on our 7-column map (12px), divided
-     across those 7 columns. Clamped so it doesn't shrink below legible or
-     grow past a comfortable size on wider screens. */
-  --tile: clamp(40px, calc((100vw - 68px) / 7), 64px);
+     (16px), and the inter-tile gaps, divided across the map's columns.
+     --board-cols is set per-board from G.width so a wider map auto-fits
+     instead of assuming 7; the fallback keeps this sane if it's ever unset.
+     Clamped so it doesn't shrink below legible or grow past a comfortable
+     size on wider screens — a map too wide to fit at the minimum simply
+     scrolls, and the zoom control can shrink it further on purpose. */
+  --tile: clamp(40px, calc((100vw - 68px) / var(--board-cols, 7)), 64px);
   --tile-gap: 2px;
   --board-pad: 8px;
   --ink: #e8eef6;
@@ -127,8 +130,50 @@ body {
   align-items: flex-start;
 }
 
+/* Positioning context for the zoom control, which must stay put while the
+   board scrolls beneath it.
+
+   min-width:0 is load-bearing: as a flex item this defaults to min-width:auto,
+   which refuses to shrink below its content. A zoomed-in board would then
+   stretch this box to the board's full width, the scroll container would never
+   be narrower than its contents, and horizontal panning would silently never
+   engage — the page itself would scroll sideways instead. */
+.we-board-area {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .we-board-wrap {
-  overflow-x: auto;
+  /* Both axes: a large map is taller than the viewport as well as wider.
+     The height cap is what makes vertical panning possible at all — without
+     it the wrap just grows and the whole page scrolls instead, which would
+     drag the header and side panel out of view while playing. */
+  overflow: auto;
+  max-width: 100%;
+  max-height: min(70dvh, 720px);
+  overscroll-behavior: contain;
+}
+
+.we-zoom {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 22;
+  display: flex;
+  gap: 4px;
+}
+
+.we-zoom .we-iconbutton {
+  /* Solid rather than the header's translucent panel: this floats directly
+     over board art, so it needs its own backing to stay readable. */
+  background: rgba(13, 20, 32, 0.92);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+.we-zoom .we-iconbutton:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .we-board {

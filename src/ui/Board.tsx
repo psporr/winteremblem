@@ -56,6 +56,18 @@ const CRIT_PUNCH_SCALE = 1.3;
 /** How long the full-screen crit flash stays visible. */
 const CRIT_FLASH_MS = 260;
 
+/**
+ * Tile sizes the zoom control steps through, in px.
+ *
+ * These set `--tile` directly rather than applying a CSS `transform: scale()`
+ * over the board. Everything on the board — tile art, sprites, highlights,
+ * the floating action menu's anchor — is already sized off `--tile`, so
+ * changing it resizes the whole thing coherently, and the pixel art stays
+ * crisp because it's re-rasterised at the new size instead of being scaled
+ * after the fact.
+ */
+const ZOOM_LEVELS = [24, 32, 40, 48, 56, 64, 80];
+
 const EMPTY_REACHABLE = new Map<string, ReachableTile>();
 
 /**
@@ -134,6 +146,13 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [inventoryUnitId, setInventoryUnitId] = useState<string | null>(null);
   const [waveBanner, setWaveBanner] = useState<number | null>(null);
+  /**
+   * Index into ZOOM_LEVELS, or null to let board.css's responsive `--tile`
+   * clamp decide. Starts null so a map that already fits keeps the exact
+   * sizing it has today; the first zoom press seeds from whatever size is
+   * actually on screen, so zooming never jumps.
+   */
+  const [zoomIndex, setZoomIndex] = useState<number | null>(null);
   /** Announcements waiting to be shown, oldest first. */
   const [popupQueue, setPopupQueue] = useState<Popup[]>([]);
   /** `seq` re-keys the element so the sweep replays on back-to-back phases. */
@@ -476,6 +495,37 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     undo();
     clearSelection();
   }
+
+  /**
+   * Steps the zoom one level in `direction`.
+   *
+   * When no zoom has been chosen yet, the starting level is read from the
+   * board's *rendered* tile size rather than assumed, so the first press
+   * continues from what's on screen instead of snapping to some default —
+   * `--tile` is a viewport-dependent clamp, so its current value isn't
+   * knowable without measuring.
+   */
+  function stepZoom(direction: 1 | -1) {
+    sound.play('click');
+    setZoomIndex((current) => {
+      let index = current;
+      if (index === null) {
+        const tile = boardRef.current?.querySelector('.we-tile') as HTMLElement | null;
+        const rendered = tile?.getBoundingClientRect().width ?? ZOOM_LEVELS[2];
+        // Nearest level to what's already showing.
+        index = ZOOM_LEVELS.reduce(
+          (best, level, i) =>
+            Math.abs(level - rendered) < Math.abs(ZOOM_LEVELS[best] - rendered) ? i : best,
+          0,
+        );
+      }
+      return Math.max(0, Math.min(ZOOM_LEVELS.length - 1, index + direction));
+    });
+  }
+
+  const zoomTilePx = zoomIndex === null ? null : ZOOM_LEVELS[zoomIndex];
+  const canZoomIn = zoomIndex === null || zoomIndex < ZOOM_LEVELS.length - 1;
+  const canZoomOut = zoomIndex === null || zoomIndex > 0;
 
   function handleCancelTargeting() {
     sound.play('cancel');
@@ -953,6 +1003,35 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
       )}
 
       <div className="we-layout">
+        {/* The zoom control sits outside .we-board-wrap's scroll box so it
+            stays pinned while a large map is panned around underneath it. */}
+        <div className="we-board-area">
+          <div className="we-zoom">
+            <button
+              type="button"
+              className="we-iconbutton we-iconbutton--icon"
+              aria-label="Zoom out"
+              title="Zoom out"
+              disabled={!canZoomOut}
+              onClick={() => stepZoom(-1)}
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path fill="currentColor" d="M5 11h14v2H5z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="we-iconbutton we-iconbutton--icon"
+              aria-label="Zoom in"
+              title="Zoom in"
+              disabled={!canZoomIn}
+              onClick={() => stepZoom(1)}
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z" />
+              </svg>
+            </button>
+          </div>
         <div className="we-board-wrap">
           <div
             ref={boardRef}
@@ -967,6 +1046,12 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
               {
                 gridTemplateColumns: `repeat(${G.width}, var(--tile))`,
                 '--terrain-src': `url(${terrainTileset})`,
+                // Feeds the responsive clamp in board.css so auto-fit divides
+                // by this map's real column count, not a hardcoded 7.
+                '--board-cols': G.width,
+                // Only set once the player has actually zoomed; otherwise the
+                // stylesheet's clamp stays in charge.
+                ...(zoomTilePx !== null ? { '--tile': `${zoomTilePx}px` } : {}),
               } as CSSProperties
             }
           >
@@ -1117,6 +1202,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
               </div>
             )}
           </div>
+        </div>
         </div>
 
         <aside className="we-sidebar">

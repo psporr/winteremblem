@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Client } from 'boardgame.io/react';
 
 import { createWinterEmblem } from './game/game';
-import { CAMPAIGN_CHAPTERS, CHAPTER_1 } from './game/maps';
+import { CAMPAIGN_CHAPTERS, CHAPTER_1, LARGE_MAP_DEMO } from './game/maps';
 import type { GameMode } from './game/types';
 import { Board } from './ui/Board';
 import { ChapterSelect, TitleScreen } from './ui/TitleScreen';
@@ -38,10 +38,14 @@ export default function App() {
   // recreating it mid-battle would silently restart the chapter.
   const GameClient = useMemo(() => {
     if (screen.kind !== 'game') return null;
+    // Roguelike normally means CHAPTER_1, but the zoom demo reuses the same
+    // wave flow on an oversized map, so resolve by id rather than assuming.
     const chapter =
       screen.mode === 'campaign'
         ? (CAMPAIGN_CHAPTERS.find((candidate) => candidate.id === screen.chapterId) ?? CAMPAIGN_CHAPTERS[0])
-        : CHAPTER_1;
+        : screen.chapterId === LARGE_MAP_DEMO.id
+          ? LARGE_MAP_DEMO
+          : CHAPTER_1;
 
     return Client({
       game: createWinterEmblem(screen.mode, chapter),
@@ -56,6 +60,9 @@ export default function App() {
       <TitleScreen
         onPlayRoguelike={() => setScreen({ kind: 'game', mode: 'roguelike', chapterId: CHAPTER_1.id, runId: 0 })}
         onOpenCampaign={() => setScreen({ kind: 'chapter-select' })}
+        onPlayLargeMapDemo={() =>
+          setScreen({ kind: 'game', mode: 'roguelike', chapterId: LARGE_MAP_DEMO.id, runId: 0 })
+        }
       />
     );
   }
