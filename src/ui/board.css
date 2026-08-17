@@ -1436,12 +1436,16 @@ body {
   }
 }
 
-/* A translucent full-screen color wash accompanying the phase-banner sweep
-   above — the board-local band reads as the announcement, this is what
-   sells the *whole screen* changing hands, closer to how the mainline
-   games' phase transition actually feels than a board-width band alone. */
+/* A translucent color wash across the tile map accompanying the phase-
+   banner sweep above — the board-local band reads as the announcement,
+   this is what sells the map itself changing hands. Scoped to the map
+   rather than the whole page, so it doesn't wash over the header and side
+   panel too. Positioned absolute (not fixed) against .we-board-area, which
+   never scrolls, so this always covers exactly the visible map regardless
+   of scroll position or zoom — see the comment where it's rendered in
+   Board.tsx for why .we-board-wrap itself won't work for this. */
 .we-phase-tint {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 25;
   pointer-events: none;
@@ -1473,12 +1477,14 @@ body {
   }
 }
 
-/* The crit flash: a hard, fast white pulse across the whole viewport,
-   standing in for the mainline games' dedicated critical-hit cutscene. Peaks
-   almost immediately and clears fast — this fires mid-combat, so it can't
-   afford to obscure the board for long. */
+/* The crit flash: a hard, fast white pulse across the tile map, standing in
+   for the mainline games' dedicated critical-hit cutscene. Peaks almost
+   immediately and clears fast — this fires mid-combat, so it can't afford
+   to obscure the board for long. Scoped to .we-board-area for the same
+   reason as .we-phase-tint above: it's a map effect, not a page effect, and
+   needs a non-scrolling anchor to stay correctly placed under zoom. */
 .we-crit-flash {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 26;
   pointer-events: none;

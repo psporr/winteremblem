@@ -893,15 +893,6 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
 
   return (
     <div className="we-app">
-      {/* Viewport-wide, not board-local — these two are meant to hit like a
-          screen effect, distinct from the board-anchored phase-banner sweep
-          and shake below. Both are non-interactive and keyed to remount so
-          repeats (a second crit, a fast phase flip) always restart cleanly. */}
-      {phaseBanner && (
-        <div key={`tint-${phaseBanner.seq}`} className={`we-phase-tint we-phase-tint--${phaseBanner.team}`} />
-      )}
-      {critFlashSeq != null && <div key={`flash-${critFlashSeq}`} className="we-crit-flash" />}
-
       <header className="we-header">
         {/* Campaign names the chapter you're in; roguelike is always the
             same endless run, so it just says the mode. The game's own name
@@ -1006,6 +997,20 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
         {/* The zoom control sits outside .we-board-wrap's scroll box so it
             stays pinned while a large map is panned around underneath it. */}
         <div className="we-board-area">
+          {/* Confined to the tile map, not the whole viewport — these are
+              meant to hit like a screen effect over the board specifically,
+              distinct from the header/sidebar around it. Anchored to
+              .we-board-area rather than .we-board-wrap for the same reason
+              the phase banner is: .we-board-area never scrolls, so inset:0
+              here always covers exactly what's currently visible of the
+              map, at any scroll position or zoom level. Both are non-
+              interactive and keyed to remount so repeats (a second crit, a
+              fast phase flip) always restart cleanly. */}
+          {phaseBanner && (
+            <div key={`tint-${phaseBanner.seq}`} className={`we-phase-tint we-phase-tint--${phaseBanner.team}`} />
+          )}
+          {critFlashSeq != null && <div key={`flash-${critFlashSeq}`} className="we-crit-flash" />}
+
           <div className="we-zoom">
             <button
               type="button"
