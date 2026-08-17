@@ -49,6 +49,22 @@ const DEFAULT_VOLUME = 0.55;
  */
 const RETRIGGER_MS = 40;
 
+/**
+ * Reads the saved volume, falling back to the default when nothing is stored.
+ *
+ * The absent case has to be rejected *before* coercing: `Number(null)` and
+ * `Number('')` are both 0, which is a perfectly valid volume, so a plain
+ * `Number(...)` plus a 0..1 range check silently hands every first-time
+ * player a muted game rather than the default.
+ */
+function readStoredVolume(supported: boolean): number {
+  if (!supported) return DEFAULT_VOLUME;
+  const raw = localStorage.getItem(VOLUME_KEY);
+  if (raw === null || raw.trim() === '') return DEFAULT_VOLUME;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : DEFAULT_VOLUME;
+}
+
 type AudioContextCtor = typeof AudioContext;
 
 function audioContextCtor(): AudioContextCtor | null {
@@ -91,8 +107,7 @@ class SoundManager {
     this.supported = audioContextCtor() !== null;
 
     this.muted = this.supported && localStorage.getItem(MUTE_KEY) === '1';
-    const stored = this.supported ? Number(localStorage.getItem(VOLUME_KEY)) : NaN;
-    this.volume = Number.isFinite(stored) && stored >= 0 && stored <= 1 ? stored : DEFAULT_VOLUME;
+    this.volume = readStoredVolume(this.supported);
 
     // Fetching needs no AudioContext and no user gesture, so the bytes are
     // already in hand by the time the first click creates one.
