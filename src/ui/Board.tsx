@@ -51,6 +51,10 @@ const COMBAT_BEAT_MS = 500;
 const LUNGE_HOLD_MS = 180;
 /** Fraction of a tile the striker steps toward its target — a nudge, not a lunge onto the tile. */
 const LUNGE_FRACTION = 0.22;
+/** How large a crit's striker briefly scales up during its punch-in. */
+const CRIT_PUNCH_SCALE = 1.3;
+/** How long the full-screen crit flash stays visible. */
+const CRIT_FLASH_MS = 260;
 
 const EMPTY_REACHABLE = new Map<string, ReachableTile>();
 
@@ -134,8 +138,14 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   const [popupQueue, setPopupQueue] = useState<Popup[]>([]);
   /** `seq` re-keys the element so the sweep replays on back-to-back phases. */
   const [phaseBanner, setPhaseBanner] = useState<{ team: Team; seq: number } | null>(null);
-  /** The unit currently leaning toward whoever it's striking this beat, and how far. */
-  const [lunge, setLunge] = useState<{ unitId: string; dx: number; dy: number } | null>(null);
+  /**
+   * The unit currently leaning toward whoever it's striking this beat, and
+   * how far. `crit` adds an extra punch-in scale on top of the lean, for a
+   * skill or attack that landed a critical hit.
+   */
+  const [lunge, setLunge] = useState<{ unitId: string; dx: number; dy: number; crit: boolean } | null>(null);
+  /** Re-keys the full-screen crit flash so back-to-back crits (Sword Dance) both flash. */
+  const [critFlashSeq, setCritFlashSeq] = useState<number | null>(null);
   const particlesRef = useRef<ParticleBurstHandle | null>(null);
   const boardRef = useRef<HTMLDivElement | null>(null);
   const { exitToMenu, retry } = useMenuActions();
@@ -485,6 +495,18 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   }
 
   /**
+   * A hard white flash across the whole viewport — the closest a tile
+   * sprite can get to the mainline games' dedicated crit cutscene without an
+   * actual battle scene to cut away to. `seq` is bumped rather than just
+   * flipping a boolean, so the div remounts (via its key) and the animation
+   * restarts even if two crits land close together, like Sword Dance's pair.
+   */
+  function triggerCritFlash() {
+    setCritFlashSeq((seq) => (seq ?? 0) + 1);
+    window.setTimeout(() => setCritFlashSeq(null), CRIT_FLASH_MS);
+  }
+
+  /**
    * Restarts the impact shake. The class has to come off and the element be
    * reflowed before it goes back on, or a second hit within the same combat
    * wouldn't replay the animation. Safe to drive imperatively: .we-board's
@@ -505,9 +527,10 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
    * beat later. A direction-only nudge (-1/0/1 per axis) rather than a
    * fraction of the distance, so a ranged unit (bow, staff) takes the same
    * small step forward as someone landing a melee hit next door, instead of
-   * lunging halfway across the board.
+   * lunging halfway across the board. `crit` adds a punch-in scale for the
+   * same duration, on top of the lean.
    */
-  function triggerLunge(strikerId: string, hitUnitIds: string[]) {
+  function triggerLunge(strikerId: string, hitUnitIds: string[], crit: boolean) {
     const striker = G.units[strikerId];
     const hitUnits = hitUnitIds.map((id) => G.units[id]).filter((u): u is Unit => !!u);
     if (!striker || hitUnits.length === 0) return;
@@ -516,9 +539,9 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     const avgY = hitUnits.reduce((sum, u) => sum + u.y, 0) / hitUnits.length;
     const dx = Math.sign(avgX - striker.x);
     const dy = Math.sign(avgY - striker.y);
-    if (dx === 0 && dy === 0) return;
+    if (dx === 0 && dy === 0 && !crit) return;
 
-    setLunge({ unitId: strikerId, dx, dy });
+    setLunge({ unitId: strikerId, dx, dy, crit });
     window.setTimeout(() => {
       setLunge((prev) => (prev?.unitId === strikerId ? null : prev));
     }, LUNGE_HOLD_MS);
@@ -572,6 +595,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
           // Positions are read from G rather than carried on the beat: no unit
           // moves once a beat sequence has started, so G is accurate here even
           // though the underlying move hasn't been dispatched yet.
+          const beatIsCrit = beat.some((hit) => hit.floatingNumber?.crit);
           for (const hit of beat) {
             const target = G.units[hit.unitId];
             if (!target) continue;
@@ -585,8 +609,9 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
             if (hit.hp <= 0) sound.play('defeat');
           }
           if (beat.some((hit) => hit.shake)) {
-            shakeBoard(beat.some((hit) => hit.floatingNumber?.crit));
+            shakeBoard(beatIsCrit);
           }
+          if (beatIsCrit) triggerCritFlash();
 
           if (participants) {
             const hitIds = beat.map((hit) => hit.unitId);
@@ -594,7 +619,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
             const targetIsHit = hitSet.has(participants.targetId);
             const attackerIsHit = hitSet.has(participants.attackerId);
             const striker = targetIsHit && !attackerIsHit ? participants.attackerId : !targetIsHit && attackerIsHit ? participants.targetId : null;
-            if (striker) triggerLunge(striker, hitIds);
+            if (striker) triggerLunge(striker, hitIds, beatIsCrit);
           }
         },
         20 + i * COMBAT_BEAT_MS,
@@ -818,6 +843,15 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
 
   return (
     <div className="we-app">
+      {/* Viewport-wide, not board-local — these two are meant to hit like a
+          screen effect, distinct from the board-anchored phase-banner sweep
+          and shake below. Both are non-interactive and keyed to remount so
+          repeats (a second crit, a fast phase flip) always restart cleanly. */}
+      {phaseBanner && (
+        <div key={`tint-${phaseBanner.seq}`} className={`we-phase-tint we-phase-tint--${phaseBanner.team}`} />
+      )}
+      {critFlashSeq != null && <div key={`flash-${critFlashSeq}`} className="we-crit-flash" />}
+
       <header className="we-header">
         {/* Campaign names the chapter you're in; roguelike is always the
             same endless run, so it just says the mode. The game's own name
@@ -1001,13 +1035,18 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 // of distance — see LUNGE_FRACTION.
                 const lungeDx = lunge?.unitId === unit.id ? lunge.dx : 0;
                 const lungeDy = lunge?.unitId === unit.id ? lunge.dy : 0;
+                // A punch-in on a crit's striker, on top of the lean. Scale is
+                // last in the transform list, so it grows from the sprite's
+                // own already-translated center rather than shifting position.
+                const critScale = lunge?.unitId === unit.id && lunge.crit ? CRIT_PUNCH_SCALE : 1;
 
                 return (
                   <div
                     key={unit.id}
                     className="we-unit-slot"
                     style={{
-                      transform: `translate(calc((var(--tile) + var(--tile-gap)) * ${unit.x} + var(--tile) * ${lungeDx * LUNGE_FRACTION}), calc((var(--tile) + var(--tile-gap)) * ${unit.y} + var(--tile) * ${lungeDy * LUNGE_FRACTION}))`,
+                      transform: `translate(calc((var(--tile) + var(--tile-gap)) * ${unit.x} + var(--tile) * ${lungeDx * LUNGE_FRACTION}), calc((var(--tile) + var(--tile-gap)) * ${unit.y} + var(--tile) * ${lungeDy * LUNGE_FRACTION})) scale(${critScale})`,
+                      zIndex: critScale > 1 ? 2 : undefined,
                     }}
                   >
                     <UnitToken
