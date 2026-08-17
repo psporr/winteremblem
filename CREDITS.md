@@ -13,3 +13,14 @@ no changes were made to the sprites themselves.
 **Unit sprites** (`src/assets/units/`) — original artwork drawn for this
 project by a friend of the developer. No external license applies. Covers all
 seven classes: Swordsman, Archer, Lancer, Mage, Barbarian, Cleric, and Dancer.
+
+## Audio
+
+**Sound effects** (`src/assets/audio/`) — from
+[Digital Audio](https://kenney.nl/assets/digital-audio) by Kenney Vleugels
+([kenney.nl](https://kenney.nl)), licensed under
+[CC0 1.0](http://creativecommons.org/publicdomain/zero/1.0/). Renamed by
+gameplay role; original filenames in the pack were `zap1` (hit), `zapThreeToneDown`
+(crit), `powerUp5` (heal), `powerUp10` (level-up), `pepSound2` (drop),
+`highUp` (wave-clear), `tone1` (click), `twoTone2` (confirm), `lowThreeTone`
+(cancel), `phaserUp2` (turn), `lowDown` (defeat).

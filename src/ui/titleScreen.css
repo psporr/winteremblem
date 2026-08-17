@@ -14,8 +14,15 @@
    left a large empty band above it. ChapterSelect (and any other screen
    sharing .we-title) stays centred. */
 .we-title--top {
+  position: relative;
   align-items: flex-start;
   padding-top: 40px;
+}
+
+.we-title__mute {
+  position: absolute;
+  top: 16px;
+  right: 16px;
 }
 
 .we-title__inner {

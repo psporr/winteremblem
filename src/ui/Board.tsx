@@ -6,6 +6,8 @@ import { PLAYER_ID } from '../game/types';
 import terrainTileset from '../assets/terrain/toen-terrain.png';
 import { UNIT_SPRITES, SPRITE_DISPLAY_HEIGHT } from './unitSprites';
 import { ParticleLayer, type ParticleBurstHandle } from './ParticleLayer';
+import { MuteToggle } from './MuteToggle';
+import { sound } from './sound';
 import {
   computeReachable,
   computeThreatTiles,
@@ -136,6 +138,21 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx.currentPlayer]);
 
+  // Cues the enemy phase handing back to the player — the End Turn button
+  // covers the player's own action, but nothing else marks this transition.
+  // Keyed off the previous *known* player rather than a "first render" flag:
+  // boardgame.io's local client can settle into its initial ctx over a
+  // couple of renders, so "not the first render" isn't the same as "not the
+  // initial battle load" — only a genuine enemy-to-player handoff should cue.
+  const prevPlayerRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prevPlayer = prevPlayerRef.current;
+    prevPlayerRef.current = ctx.currentPlayer;
+    if (prevPlayer === PLAYER_ID.enemy && ctx.currentPlayer === PLAYER_ID.player && !ctx.gameover) {
+      sound.play('turn');
+    }
+  }, [ctx.currentPlayer, ctx.gameover]);
+
   // A brief centered banner at the start of every wave, including the very
   // first one on load. Purely a client-side toast — G.wave already drives
   // the real state, this just announces the change.
@@ -144,6 +161,36 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     const timer = window.setTimeout(() => setWaveBanner(null), 1800);
     return () => window.clearTimeout(timer);
   }, [G.wave]);
+
+  /**
+   * Cues level-up, loot, and wave-clear off the battle log instead of the
+   * moves that cause them — those events can happen mid-combo (Nova killing
+   * several enemies at once) or from the CPU's own turn, so hanging a sound
+   * on the log is simpler than threading one through every code path that
+   * can produce one. `pushLog` always unshifts, so whatever's new is exactly
+   * the front slice the previous length doesn't cover; a shrinking or
+   * unchanged log (a fresh battle, a retry) is treated as "nothing to cue".
+   */
+  const prevLogLenRef = useRef(G.log.length);
+  useEffect(() => {
+    const prevLen = prevLogLenRef.current;
+    prevLogLenRef.current = G.log.length;
+    if (G.log.length <= prevLen) return;
+
+    for (const entry of G.log.slice(0, G.log.length - prevLen)) {
+      const levelUp = entry.match(/^(.+) reached level \d+!$/);
+      if (levelUp) {
+        // Enemies level up too; only the player's own squad gets the fanfare.
+        if (Object.values(G.units).some((u) => u.name === levelUp[1] && u.team === 'player')) {
+          sound.play('levelUp');
+        }
+      } else if (entry.includes(' dropped ')) {
+        sound.play('drop');
+      } else if (entry.includes('Choose your blessing')) {
+        sound.play('waveClear');
+      }
+    }
+  }, [G.log, G.units]);
 
   // Drive the CPU one action at a time; each dispatch mutates G and re-runs this.
   useEffect(() => {
@@ -271,6 +318,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
       : null;
 
   function selectUnit(unit: Unit) {
+    sound.play('click');
     setSelectedId(unit.id);
     setMode('move');
     setPendingTargetId(null);
@@ -278,6 +326,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
 
   function confirmDestination(x: number, y: number) {
     if (!selected) return;
+    sound.play('click');
     if (!selected.hasMoved) moves.moveUnit(selected.id, x, y);
     setMode('menu');
   }
@@ -310,6 +359,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
 
     if (mode === 'targeting') {
       if (clicked && attackTargetIds.has(clicked.id)) {
+        sound.play('click');
         setPendingTargetId(clicked.id);
         setMode('confirm');
       }
@@ -319,6 +369,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
 
     if (mode === 'skill-targeting') {
       if (clicked && skillTargetIds.has(clicked.id)) {
+        sound.play('click');
         setPendingTargetId(clicked.id);
         setMode('skill-confirm');
       }
@@ -329,34 +380,41 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   }
 
   function handleAttackPressed() {
+    sound.play('click');
     setMode('targeting');
   }
 
   function handleSkillPressed() {
+    sound.play('click');
     setMode('skill-targeting');
   }
 
   function handleWaitPressed() {
     if (!selected) return;
+    sound.play('confirm');
     moves.waitUnit(selected.id);
     clearSelection();
   }
 
   function handleBackPressed() {
+    sound.play('cancel');
     undo();
     clearSelection();
   }
 
   function handleCancelTargeting() {
+    sound.play('cancel');
     setMode('menu');
   }
 
   function handleCancelConfirm() {
+    sound.play('cancel');
     setPendingTargetId(null);
     setMode('targeting');
   }
 
   function handleCancelSkillConfirm() {
+    sound.play('cancel');
     setPendingTargetId(null);
     setMode('skill-targeting');
   }
@@ -454,9 +512,12 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
             if (!target) continue;
             if (hit.floatingNumber?.kind === 'heal') {
               particlesRef.current?.burst(target.x, target.y, 'heal', burstVariant);
+              sound.play('heal');
             } else if (hit.shake) {
               particlesRef.current?.burst(target.x, target.y, 'damage', burstVariant);
+              sound.play(hit.floatingNumber?.crit ? 'crit' : 'hit');
             }
+            if (hit.hp <= 0) sound.play('defeat');
           }
           if (beat.some((hit) => hit.shake)) {
             shakeBoard(beat.some((hit) => hit.floatingNumber?.crit));
@@ -593,6 +654,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
 
   function handleConfirmSkill() {
     if (!selected || !pendingTargetId) return;
+    sound.play('confirm');
     const unitId = selected.id;
     const targetId = pendingTargetId;
     const predicted = skillPredicted;
@@ -625,6 +687,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
    */
   function handleConfirmAttack() {
     if (!selected || !pendingTargetId || !forecast || !previewTarget) return;
+    sound.play('confirm');
 
     const attackerId = selected.id;
     const targetId = pendingTargetId;
@@ -666,12 +729,16 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
             (and version) live on the title screen, where there's room. */}
         <h1>{G.mode === 'campaign' ? G.chapterShortName : 'Roguelike'}</h1>
         <div className="we-header-actions">
+          <MuteToggle />
           <button
             type="button"
             className="we-iconbutton we-iconbutton--icon"
             aria-label="Main menu"
             title="Main menu"
-            onClick={exitToMenu}
+            onClick={() => {
+              sound.play('cancel');
+              exitToMenu();
+            }}
           >
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
               <path fill="currentColor" d="M12 3 2 12h3v8h6v-5h2v5h6v-8h3L12 3z" />
@@ -683,7 +750,10 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
             aria-pressed={showThreat}
             aria-label={`${showThreat ? 'Hide' : 'Show'} enemy range`}
             title={`${showThreat ? 'Hide' : 'Show'} enemy range`}
-            onClick={() => setShowThreat((value) => !value)}
+            onClick={() => {
+              sound.play('click');
+              setShowThreat((value) => !value);
+            }}
           >
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
               <path
@@ -699,6 +769,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
               aria-label={`Squad & inventory${G.inventory.length > 0 ? ` (${G.inventory.length} item${G.inventory.length === 1 ? '' : 's'} to equip)` : ''}`}
               title="Squad & inventory"
               onClick={() => {
+                sound.play('click');
                 setInventoryUnitId((current) => current ?? selectedId ?? unitsOf(G, 'player')[0]?.id ?? null);
                 setInventoryOpen(true);
               }}
@@ -721,6 +792,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
               aria-label="End turn"
               title="End turn"
               onClick={() => {
+                sound.play('turn');
                 clearSelection();
                 events.endTurn?.();
               }}
@@ -917,9 +989,18 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
           G={G}
           unitId={inventoryUnitId}
           onSelectUnit={setInventoryUnitId}
-          onEquip={(unitId, instanceId) => moves.equipItem(unitId, instanceId)}
-          onUnequip={(unitId, slot) => moves.unequipItem(unitId, slot)}
-          onClose={() => setInventoryOpen(false)}
+          onEquip={(unitId, instanceId) => {
+            sound.play('confirm');
+            moves.equipItem(unitId, instanceId);
+          }}
+          onUnequip={(unitId, slot) => {
+            sound.play('cancel');
+            moves.unequipItem(unitId, slot);
+          }}
+          onClose={() => {
+            sound.play('cancel');
+            setInventoryOpen(false);
+          }}
         />
       )}
 
@@ -937,7 +1018,10 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                     key={blessing.id}
                     type="button"
                     className="we-blessing"
-                    onClick={() => moves.chooseBlessing(blessing.id)}
+                    onClick={() => {
+                      sound.play('confirm');
+                      moves.chooseBlessing(blessing.id);
+                    }}
                   >
                     <strong>{blessing.name}</strong>
                     <span>{blessing.description}</span>
@@ -961,10 +1045,24 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                   : `Your company has been wiped out, having survived ${G.wave} wave${G.wave === 1 ? '' : 's'}.`}
             </p>
             <div className="we-overlay__actions">
-              <button type="button" className="we-button" onClick={retry}>
+              <button
+                type="button"
+                className="we-button"
+                onClick={() => {
+                  sound.play('confirm');
+                  retry();
+                }}
+              >
                 {gameover.winner === 'player' ? 'Play again' : 'Retry'}
               </button>
-              <button type="button" className="we-button we-button--ghost" onClick={exitToMenu}>
+              <button
+                type="button"
+                className="we-button we-button--ghost"
+                onClick={() => {
+                  sound.play('cancel');
+                  exitToMenu();
+                }}
+              >
                 Main menu
               </button>
             </div>

@@ -1,5 +1,7 @@
 import { CAMPAIGN_CHAPTERS } from '../game/maps';
 import pkg from '../../package.json';
+import { MuteToggle } from './MuteToggle';
+import { sound } from './sound';
 import './titleScreen.css';
 
 const GAME_VERSION = pkg.version;
@@ -17,6 +19,7 @@ export function TitleScreen({
 }) {
   return (
     <div className="we-title we-title--top">
+      <MuteToggle className="we-iconbutton we-iconbutton--icon we-title__mute" />
       <div className="we-title__inner">
         <h1 className="we-title__name we-title__name--brand">
           BIBI&rsquo;s <span>WinterEmblem</span>
@@ -24,7 +27,14 @@ export function TitleScreen({
         <p className="we-title__tagline">A turn-based tactics RPG</p>
 
         <div className="we-title__modes">
-          <button type="button" className="we-mode-card" onClick={onOpenCampaign}>
+          <button
+            type="button"
+            className="we-mode-card"
+            onClick={() => {
+              sound.play('confirm');
+              onOpenCampaign();
+            }}
+          >
             <span className="we-mode-card__name">Campaign</span>
             <span className="we-mode-card__blurb">
               Hand-crafted chapters, each with its own objective. Your squad carries its levels and gear
@@ -35,7 +45,14 @@ export function TitleScreen({
             </span>
           </button>
 
-          <button type="button" className="we-mode-card we-mode-card--roguelike" onClick={onPlayRoguelike}>
+          <button
+            type="button"
+            className="we-mode-card we-mode-card--roguelike"
+            onClick={() => {
+              sound.play('confirm');
+              onPlayRoguelike();
+            }}
+          >
             <span className="we-mode-card__name">Roguelike</span>
             <span className="we-mode-card__blurb">
               Endless waves on one map. Pick a blessing after every clear and see how far you get.
@@ -79,7 +96,10 @@ export function ChapterSelect({
                 type="button"
                 className={`we-chapter${locked ? ' we-chapter--locked' : ''}`}
                 disabled={locked}
-                onClick={() => onPlayChapter(chapter.id)}
+                onClick={() => {
+                  sound.play('confirm');
+                  onPlayChapter(chapter.id);
+                }}
               >
                 <span className="we-chapter__name">{chapter.name}</span>
                 <span className="we-chapter__objective">
@@ -90,7 +110,14 @@ export function ChapterSelect({
           })}
         </div>
 
-        <button type="button" className="we-title__back" onClick={onBack}>
+        <button
+          type="button"
+          className="we-title__back"
+          onClick={() => {
+            sound.play('cancel');
+            onBack();
+          }}
+        >
           Back
         </button>
       </div>
