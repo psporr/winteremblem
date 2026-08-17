@@ -97,11 +97,13 @@ export function buildGameState(chapter: ChapterDef, mode: GameMode, random: Shuf
 
     units[spec.id] = {
       id: spec.id,
-      // Enemies are anonymous rank-and-file, so their display name is always
-      // derived from class rather than authored per spec — matches the
-      // convention spawnWave uses for later roguelike waves. Player units
-      // keep their authored name.
-      name: spec.team === 'enemy' ? `${className} Shadow` : spec.name,
+      // Roguelike enemies are anonymous rank-and-file, so their display name
+      // is always derived from class — matches the convention spawnWave uses
+      // for later waves. Campaign enemies keep their authored name instead:
+      // chapters are hand-written and will eventually carry story around
+      // named individuals (a chapter boss, a recurring rival), which a
+      // class-derived label would erase.
+      name: spec.team === 'enemy' && mode === 'roguelike' ? `${className} Shadow` : spec.name,
       team: spec.team,
       className,
       x: spec.x,
