@@ -1182,27 +1182,36 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
               />
             )}
 
-            {waveBanner != null && (
-              <div key={waveBanner} className="we-wave-banner" aria-live="polite">
-                {/* Campaign has no waves — announce the chapter's objective
-                    instead, which is the thing a player needs at battle start. */}
-                {G.mode === 'campaign' ? G.objective : `Wave ${waveBanner} Starts`}
-              </div>
-            )}
-
-            {phaseBanner && (
-              <div
-                key={phaseBanner.seq}
-                className={`we-phase-banner we-phase-banner--${phaseBanner.team}`}
-                aria-live="polite"
-              >
-                <span className="we-phase-banner__text">
-                  {phaseBanner.team === 'player' ? 'Player Phase' : 'Enemy Phase'}
-                </span>
-              </div>
-            )}
           </div>
         </div>
+
+        {/* Outside .we-board-wrap entirely, not just outside .we-board — a
+            position:absolute element still scrolls along with its scroll-
+            container ancestor even when it isn't the ancestor being
+            scrolled itself (only position:fixed/sticky escape that). Anchored
+            to .we-board-area instead, which never scrolls: its own height is
+            just whatever .we-board-wrap renders at (the capped viewport
+            size, not the full board), so top:50% here means the middle of
+            what's actually on screen, at any scroll position or zoom. */}
+        {waveBanner != null && (
+          <div key={waveBanner} className="we-wave-banner" aria-live="polite">
+            {/* Campaign has no waves — announce the chapter's objective
+                instead, which is the thing a player needs at battle start. */}
+            {G.mode === 'campaign' ? G.objective : `Wave ${waveBanner} Starts`}
+          </div>
+        )}
+
+        {phaseBanner && (
+          <div
+            key={phaseBanner.seq}
+            className={`we-phase-banner we-phase-banner--${phaseBanner.team}`}
+            aria-live="polite"
+          >
+            <span className="we-phase-banner__text">
+              {phaseBanner.team === 'player' ? 'Player Phase' : 'Enemy Phase'}
+            </span>
+          </div>
+        )}
         </div>
 
         <aside className="we-sidebar">
