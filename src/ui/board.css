@@ -159,7 +159,11 @@ body {
      fit-view tile size are derived from the same number. The dvh fallback is
      only for the first paint before that runs; dvh is avoided thereafter
      because iOS reports it against the toolbar-collapsed viewport, which is
-     taller than what's actually on screen. */
+     taller than what's actually on screen.
+
+     Board.tsx overrides `overflow` inline: the fit view shows the whole
+     board, so it is locked to hidden and cannot pan into empty space. This
+     value applies before the first measurement and in the detail view. */
   overflow: auto;
   max-width: 100%;
   max-height: var(--board-max-h, min(70dvh, 720px));

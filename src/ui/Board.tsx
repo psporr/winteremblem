@@ -180,8 +180,17 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
    * Measured board sizing. `fitTilePx` is the largest tile that still shows
    * the whole map; `maxHeightPx` is the height budget both it and the scroll
    * container are derived from. Null only until the first measurement lands.
+   *
+   * `fitShowsWholeBoard` is normally true — that is what the fit view is —
+   * but `fitTilePx` has a legibility floor, so on a viewport too narrow for
+   * a big map the fit view can still overflow. It records whether the floor
+   * was hit, so scrolling is only ever disabled when it is genuinely useless.
    */
-  const [sizing, setSizing] = useState<{ fitTilePx: number; maxHeightPx: number } | null>(null);
+  const [sizing, setSizing] = useState<{
+    fitTilePx: number;
+    maxHeightPx: number;
+    fitShowsWholeBoard: boolean;
+  } | null>(null);
   /** False while the map is small enough that both views look identical. */
   const [canZoom, setCanZoom] = useState(false);
   /** Announcements waiting to be shown, oldest first. */
@@ -264,12 +273,16 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
 
       const byWidth = (availableWidth - BOARD_PAD_PX * 2 - (G.width - 1) * TILE_GAP_PX) / G.width;
       const byHeight = (maxHeightPx - BOARD_PAD_PX * 2 - (G.height - 1) * TILE_GAP_PX) / G.height;
-      const fitTilePx = Math.max(
-        FIT_MIN_TILE_PX,
-        Math.min(byWidth, byHeight, FIT_MAX_TILE_PX),
-      );
+      const unclampedFit = Math.min(byWidth, byHeight, FIT_MAX_TILE_PX);
+      const fitTilePx = Math.max(FIT_MIN_TILE_PX, unclampedFit);
 
-      setSizing({ fitTilePx, maxHeightPx });
+      setSizing({
+        fitTilePx,
+        maxHeightPx,
+        // Only the legibility floor can make the fit view overflow; the
+        // ceiling just stops the board from growing past a comfortable size.
+        fitShowsWholeBoard: unclampedFit >= FIT_MIN_TILE_PX,
+      });
       // Half a pixel of slack so a fit size that rounds to the detail size
       // doesn't offer a toggle between two identical views.
       setCanZoom(fitTilePx < DETAIL_TILE_PX - 0.5);
@@ -292,6 +305,17 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   useEffect(() => {
     if (!canZoom) setZoomMode('fit');
   }, [canZoom]);
+
+  /**
+   * Returning to the fit view means "show me the whole map", so it starts at
+   * the origin rather than wherever the detail view was panned to. This runs
+   * after the DOM has taken the new size — resetting during the state update
+   * would scroll the old, larger content and the browser could then re-clamp
+   * the offset on its way down.
+   */
+  useLayoutEffect(() => {
+    if (zoomMode === 'fit') boardWrapRef.current?.scrollTo({ left: 0, top: 0 });
+  }, [zoomMode]);
 
   // Cues the enemy phase handing back to the player — the End Turn button
   // covers the player's own action, but nothing else marks this transition.
@@ -605,15 +629,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
 
   function toggleZoom() {
     sound.play('click');
-    setZoomMode((current) => {
-      const next = current === 'fit' ? 'detail' : 'fit';
-      // Returning to the fit view means "show me the whole map", so start it
-      // from the origin rather than wherever the detail view was panned to.
-      // Also belt-and-braces against a browser leaving a stale scroll offset
-      // behind when the content it was scrolling suddenly gets smaller.
-      if (next === 'fit') boardWrapRef.current?.scrollTo({ left: 0, top: 0 });
-      return next;
-    });
+    setZoomMode((current) => (current === 'fit' ? 'detail' : 'fit'));
   }
 
   function handleCancelTargeting() {
@@ -1137,7 +1153,20 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
           ref={boardWrapRef}
           style={
             sizing
-              ? ({ '--board-max-h': `${Math.round(sizing.maxHeightPx)}px` } as CSSProperties)
+              ? ({
+                  '--board-max-h': `${Math.round(sizing.maxHeightPx)}px`,
+                  // In the fit view the whole board is on screen, so there is
+                  // nothing to scroll to and panning can only ever reveal
+                  // empty space. Turning overflow off says exactly that, and
+                  // it does not depend on the engine agreeing about how big
+                  // the content is: the unit tokens are absolutely positioned
+                  // and move by transform, which contributes to this box's
+                  // scrollable overflow, and a composited transform change is
+                  // not a layout — WebKit can keep serving the extent from
+                  // before the zoom. Clamping is the only case where the fit
+                  // view really can overflow, so it keeps its scrollbars.
+                  overflow: zoomMode === 'fit' && sizing.fitShowsWholeBoard ? 'hidden' : 'auto',
+                } as CSSProperties)
               : undefined
           }
         >
