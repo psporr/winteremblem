@@ -1433,6 +1433,20 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
             </span>
           </div>
         )}
+
+        {/* Anchored here rather than the viewport so the loot toast reads as
+            part of the battle it interrupted, not a notification floating
+            over the whole page — same reasoning as the banners above it. */}
+        {visiblePopup && !inventoryOpen && (
+          <AnnouncementPopup
+            popup={visiblePopup}
+            onDismiss={() => {
+              sound.play('confirm');
+              dismissPopup();
+            }}
+            onOpenEquipment={handlePopupOpenEquipment}
+          />
+        )}
         </div>
 
         <aside className="we-sidebar">
@@ -1463,17 +1477,6 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
             sound.play('cancel');
             setInventoryOpen(false);
           }}
-        />
-      )}
-
-      {visiblePopup && !inventoryOpen && (
-        <AnnouncementPopup
-          popup={visiblePopup}
-          onDismiss={() => {
-            sound.play('confirm');
-            dismissPopup();
-          }}
-          onOpenEquipment={handlePopupOpenEquipment}
         />
       )}
 

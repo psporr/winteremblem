@@ -24,6 +24,19 @@ export function DialogueOverlay({ script, onComplete }: { script: DialogueScript
 
   return (
     <div className="we-overlay we-dialogue" role="dialog" aria-modal="true" onClick={advance}>
+      <button
+        type="button"
+        className="we-dialogue__skip"
+        onClick={(event) => {
+          // Distinct from the card's own tap-to-advance: this jumps straight
+          // to onComplete regardless of how many lines are left, rather than
+          // stepping through them one at a time.
+          event.stopPropagation();
+          onComplete();
+        }}
+      >
+        Skip
+      </button>
       <div className={`we-dialogue__card we-dialogue__card--${side}`}>
         {sprite && (
           <span

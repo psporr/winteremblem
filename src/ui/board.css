@@ -852,6 +852,26 @@ body {
   z-index: 40;
 }
 
+.we-dialogue__skip {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-edge);
+  background: rgba(13, 20, 32, 0.85);
+  color: var(--ink-dim);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+}
+
+.we-dialogue__skip:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
 .we-dialogue__card {
   display: flex;
   align-items: center;
@@ -1688,19 +1708,22 @@ body {
 }
 
 /* Item-get toast: a single line floating above the board, the way Fire
-   Emblem announces a drop instead of stopping play with a dialog. Fixed and
-   small — like .we-targeting-hint — so it never shifts the layout or blocks
-   the map underneath it while it fades in. */
+   Emblem announces a drop instead of stopping play with a dialog. Anchored
+   to .we-board-area (its nearest positioned ancestor, same reasoning as the
+   phase/wave banners next to it in the markup) rather than the viewport, so
+   it reads as part of the battle it's interrupting instead of a page-wide
+   notification — and never scrolls with .we-board-wrap underneath it, since
+   .we-board-area is outside that scroll container. */
 .we-loot-toast {
-  position: fixed;
+  position: absolute;
   top: 16px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 30;
+  z-index: 23;
   display: flex;
   align-items: baseline;
   gap: 8px;
-  max-width: min(420px, calc(100vw - 32px));
+  max-width: min(420px, calc(100% - 24px));
   padding: 8px 16px;
   border-radius: 999px;
   border: 1px solid #ffd479;
