@@ -1,17 +1,16 @@
 :root {
-  /* Fallback only. The real per-board value is computed on .we-board, which
-     is where --board-cols/--board-rows are set — a custom property is
-     substituted where it's *declared*, so a formula living up here would
-     resolve those against :root (i.e. never see the map's real size). */
+  /* Pre-measurement fallback only. Board.tsx measures the container and sets
+     the real value inline on .we-board before first paint.
+
+     Deliberately NOT computed in CSS: doing so needs calc() division by a
+     var(), nested min() inside calc(), and dvh units — all of which WebKit
+     handles inconsistently, and any one of them failing makes the whole
+     declaration invalid at computed-value time. Because --tile is inherited,
+     that failure mode is silent: the board quietly falls back to this value
+     and renders at detail size while believing it's in the fit view. */
   --tile: 46px;
   --tile-gap: 2px;
   --board-pad: 8px;
-  /* The size the 7x8 map naturally lands on for a phone, and therefore the
-     reference "comfortable" tile — the large map's zoomed-in view matches
-     it, so units read at the same scale on both map types. */
-  --tile-detail: 46px;
-  /* Ceiling for the fit view, so a small map on a desktop doesn't blow up. */
-  --tile-max: 64px;
   /* Unit art height as a multiple of the tile. Slightly over 1 so sprites
      overhang their tile a little, the way they did at the original fixed
      48px against a ~46px tile. */
@@ -154,10 +153,16 @@ body {
   /* Both axes: a large map is taller than the viewport as well as wider.
      The height cap is what makes vertical panning possible at all — without
      it the wrap just grows and the whole page scrolls instead, which would
-     drag the header and side panel out of view while playing. */
+     drag the header and side panel out of view while playing.
+
+     --board-max-h is measured and set by Board.tsx so that the cap and the
+     fit-view tile size are derived from the same number. The dvh fallback is
+     only for the first paint before that runs; dvh is avoided thereafter
+     because iOS reports it against the toolbar-collapsed viewport, which is
+     taller than what's actually on screen. */
   overflow: auto;
   max-width: 100%;
-  max-height: min(70dvh, 720px);
+  max-height: var(--board-max-h, min(70dvh, 720px));
   overscroll-behavior: contain;
 }
 
@@ -196,31 +201,6 @@ body {
      and leaving .we-particles / .we-unit-layer, which are inset against this
      box, too narrow to cover the tiles they're meant to sit over. */
   width: max-content;
-
-  /* Fit view — the largest tile that still shows the entire map at once.
-     Both axes are considered so a tall map fits vertically too, and the
-     height budget mirrors .we-board-wrap's own max-height. The subtractions
-     are .we-app's horizontal padding (40px), this element's padding, and
-     the inter-tile gaps. 100vw is capped at .we-app's max-width so a wide
-     desktop doesn't over-estimate the space actually available. */
-  --tile-fit: min(
-    calc(
-      (min(100vw, 1180px) - 40px - var(--board-pad) * 2 - (var(--board-cols) - 1) * var(--tile-gap)) /
-        var(--board-cols)
-    ),
-    calc(
-      (min(70dvh, 720px) - var(--board-pad) * 2 - (var(--board-rows) - 1) * var(--tile-gap)) / var(--board-rows)
-    )
-  );
-  --tile: clamp(20px, var(--tile-fit), var(--tile-max));
-}
-
-/* Detail view — a fixed comfortable tile regardless of map size, matching
-   what the small map renders at. Anything that no longer fits simply
-   scrolls, which is the point of the view. Declared after .we-board so it
-   wins on source order at equal specificity. */
-.we-board--detail {
-  --tile: var(--tile-detail);
 }
 
 /* Impact particles. Sits above the tiles but below .we-unit (z-index 1), so

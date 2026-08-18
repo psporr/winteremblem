@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { BoardProps } from 'boardgame.io/react';
 
 import type { GameState, Team, TerrainType, Unit } from '../game/types';
@@ -75,13 +75,24 @@ const CRIT_FLASH_MS = 260;
 type ZoomMode = 'fit' | 'detail';
 
 /**
- * Layout constants mirrored from board.css, used only to decide whether the
- * zoom toggle is worth showing. They must stay in step with `--tile-detail`,
- * `--board-pad` and `--tile-gap` there.
+ * Board sizing is measured here rather than computed in CSS. The CSS version
+ * needed calc() division by a var(), nested min() inside calc(), and dvh
+ * units; WebKit is inconsistent about all three, and because --tile is an
+ * inherited custom property, any one of them failing degrades silently — the
+ * declaration is dropped and the board inherits the :root fallback, rendering
+ * at detail size while believing it's in the fit view.
+ *
+ * `--board-pad` and `--tile-gap` must stay in step with board.css.
  */
 const DETAIL_TILE_PX = 46;
 const BOARD_PAD_PX = 8;
 const TILE_GAP_PX = 2;
+/** Floor and ceiling for the fit view: never illegibly small, never oversized on a desktop. */
+const FIT_MIN_TILE_PX = 20;
+const FIT_MAX_TILE_PX = 64;
+/** Share of the visible viewport the board may occupy before it starts panning. */
+const BOARD_HEIGHT_FRACTION = 0.7;
+const BOARD_HEIGHT_CAP_PX = 720;
 
 const EMPTY_REACHABLE = new Map<string, ReachableTile>();
 
@@ -163,6 +174,12 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   const [waveBanner, setWaveBanner] = useState<number | null>(null);
   /** Starts on 'fit' so a battle always opens showing the whole map. */
   const [zoomMode, setZoomMode] = useState<ZoomMode>('fit');
+  /**
+   * Measured board sizing. `fitTilePx` is the largest tile that still shows
+   * the whole map; `maxHeightPx` is the height budget both it and the scroll
+   * container are derived from. Null only until the first measurement lands.
+   */
+  const [sizing, setSizing] = useState<{ fitTilePx: number; maxHeightPx: number } | null>(null);
   /** False while the map is small enough that both views look identical. */
   const [canZoom, setCanZoom] = useState(false);
   /** Announcements waiting to be shown, oldest first. */
@@ -201,29 +218,52 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   }, [ctx.currentPlayer]);
 
   /**
-   * The zoom toggle only appears when the two views would actually differ —
-   * i.e. when the map can't already show every tile at the comfortable
-   * detail size. That's true of the 11x14 campaign map and false of the 7x8
-   * roguelike one, so the small map keeps exactly the chrome it has today.
+   * Measures the fit-view tile size and the board's height budget from the
+   * real container, and decides whether the zoom toggle is worth showing at
+   * all — the two views look identical whenever the map already fits at the
+   * detail size, which is the case for the 7x8 roguelike map.
    *
-   * Measured rather than hardcoded per map, because it depends on the
+   * Measured rather than hardcoded per map because it depends on the
    * viewport: the same map needs the toggle on a phone and not on a desktop,
    * and rotating the device flips the answer live.
+   *
+   * useLayoutEffect so the measured size is applied before the browser
+   * paints; with a plain effect the board would flash at the CSS fallback
+   * size first.
    */
-  useEffect(() => {
+  useLayoutEffect(() => {
     const area = boardAreaRef.current;
     if (!area) return;
 
-    const check = () => {
-      const forTiles = area.clientWidth - BOARD_PAD_PX * 2 - (G.width - 1) * TILE_GAP_PX;
-      setCanZoom(forTiles / G.width < DETAIL_TILE_PX);
+    const measure = () => {
+      // visualViewport is what's actually on screen. innerHeight (and dvh) on
+      // iOS measure against the toolbar-collapsed viewport, which is taller,
+      // so the board would be sized for space it doesn't currently have.
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const maxHeightPx = Math.min(viewportHeight * BOARD_HEIGHT_FRACTION, BOARD_HEIGHT_CAP_PX);
+
+      const byWidth = (area.clientWidth - BOARD_PAD_PX * 2 - (G.width - 1) * TILE_GAP_PX) / G.width;
+      const byHeight = (maxHeightPx - BOARD_PAD_PX * 2 - (G.height - 1) * TILE_GAP_PX) / G.height;
+      const fitTilePx = Math.max(
+        FIT_MIN_TILE_PX,
+        Math.min(byWidth, byHeight, FIT_MAX_TILE_PX),
+      );
+
+      setSizing({ fitTilePx, maxHeightPx });
+      // Half a pixel of slack so a fit size that rounds to the detail size
+      // doesn't offer a toggle between two identical views.
+      setCanZoom(fitTilePx < DETAIL_TILE_PX - 0.5);
     };
 
-    check();
-    const observer = new ResizeObserver(check);
+    measure();
+    const observer = new ResizeObserver(measure);
     observer.observe(area);
-    return () => observer.disconnect();
-  }, [G.width]);
+    window.visualViewport?.addEventListener('resize', measure);
+    return () => {
+      observer.disconnect();
+      window.visualViewport?.removeEventListener('resize', measure);
+    };
+  }, [G.width, G.height]);
 
   // A map that can't zoom must never be stuck in the detail view — e.g. after
   // rotating a phone to landscape, where everything suddenly fits.
@@ -1059,10 +1099,18 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
               </button>
             </div>
           )}
-        <div className="we-board-wrap" ref={boardWrapRef}>
+        <div
+          className="we-board-wrap"
+          ref={boardWrapRef}
+          style={
+            sizing
+              ? ({ '--board-max-h': `${Math.round(sizing.maxHeightPx)}px` } as CSSProperties)
+              : undefined
+          }
+        >
           <div
             ref={boardRef}
-            className={`we-board${zoomMode === 'detail' ? ' we-board--detail' : ''}`}
+            className="we-board"
             onAnimationEnd={(event) => {
               // Clear the shake so the class never lingers between hits.
               if (event.animationName.includes('we-board-shake')) {
@@ -1073,10 +1121,10 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
               {
                 gridTemplateColumns: `repeat(${G.width}, var(--tile))`,
                 '--terrain-src': `url(${terrainTileset})`,
-                // board.css computes --tile from these, so the fit view knows
-                // this map's real dimensions instead of assuming 7x8.
-                '--board-cols': G.width,
-                '--board-rows': G.height,
+                // The single source of truth for board scale. Set here as a
+                // plain px value rather than computed in CSS — see the note on
+                // the sizing constants for why.
+                '--tile': `${zoomMode === 'detail' ? DETAIL_TILE_PX : (sizing?.fitTilePx ?? DETAIL_TILE_PX)}px`,
               } as CSSProperties
             }
           >
