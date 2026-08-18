@@ -951,6 +951,17 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   const gameover = ctx.gameover as GameOver | undefined;
 
   /**
+   * The board's exact rendered size. Every term is known, so the box is sized
+   * from arithmetic rather than letting the grid's intrinsic size decide —
+   * see the note in board.css on why intrinsic sizing is avoided here.
+   */
+  const boardTilePx = zoomMode === 'detail' ? DETAIL_TILE_PX : (sizing?.fitTilePx ?? DETAIL_TILE_PX);
+  const boardPx = {
+    width: G.width * boardTilePx + (G.width - 1) * TILE_GAP_PX + BOARD_PAD_PX * 2,
+    height: G.height * boardTilePx + (G.height - 1) * TILE_GAP_PX + BOARD_PAD_PX * 2,
+  };
+
+  /**
    * Announcements are held back until the player is actually in control.
    * A drop or level-up can land during the enemy phase (a counterattack
    * killing its attacker), and interrupting the CPU mid-turn would both read
@@ -1146,7 +1157,12 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 // The single source of truth for board scale. Set here as a
                 // plain px value rather than computed in CSS — see the note on
                 // the sizing constants for why.
-                '--tile': `${zoomMode === 'detail' ? DETAIL_TILE_PX : (sizing?.fitTilePx ?? DETAIL_TILE_PX)}px`,
+                '--tile': `${boardTilePx}px`,
+                // Explicit rather than intrinsic (max-content) so nothing
+                // about the scroll container's extent depends on an engine
+                // recomputing a cached intrinsic size when --tile changes.
+                width: `${boardPx.width}px`,
+                height: `${boardPx.height}px`,
               } as CSSProperties
             }
           >

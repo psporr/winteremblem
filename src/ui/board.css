@@ -194,13 +194,22 @@ body {
   background: var(--panel-edge);
   border-radius: 10px;
   position: relative;
-  /* Size the box to the grid's own tracks. As an ordinary block-level grid
-     this would instead be capped at the scroll container's width while its
-     columns overflowed past it — leaving the panel background painting only
-     part of the way across (bare page showing behind the rest of the map),
-     and leaving .we-particles / .we-unit-layer, which are inset against this
-     box, too narrow to cover the tiles they're meant to sit over. */
-  width: max-content;
+  /* Width and height are set inline by Board.tsx as exact pixel values.
+     The box has to wrap the grid's own tracks — left as an ordinary
+     block-level grid it would be capped at the scroll container's width
+     while its columns overflowed past it, leaving the panel background
+     painting only part of the way across and leaving .we-particles /
+     .we-unit-layer, which are inset against this box, too narrow to cover
+     the tiles they sit over.
+
+     Deliberately NOT `width: max-content`: that is an intrinsic size derived
+     from grid tracks that are themselves sized by a custom property, and
+     it is exactly the kind of value engines cache and fail to recompute
+     when that property changes. A stale intrinsic width leaves the scroll
+     container reporting the old, larger extent after zooming back out —
+     scrollable empty space around a board that has already shrunk. The
+     dimensions are fully determined by tile/gap/padding, so they are
+     computed directly instead. */
 }
 
 /* Impact particles. Sits above the tiles but below .we-unit (z-index 1), so
