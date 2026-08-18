@@ -87,6 +87,8 @@ type ZoomMode = 'fit' | 'detail';
 const DETAIL_TILE_PX = 46;
 const BOARD_PAD_PX = 8;
 const TILE_GAP_PX = 2;
+/** .we-layout's flex gap, between the board and the sidebar. */
+const LAYOUT_GAP_PX = 12;
 /** Floor and ceiling for the fit view: never illegibly small, never oversized on a desktop. */
 const FIT_MIN_TILE_PX = 20;
 const FIT_MAX_TILE_PX = 64;
@@ -233,16 +235,34 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
    */
   useLayoutEffect(() => {
     const area = boardAreaRef.current;
-    if (!area) return;
+    const layout = area?.parentElement;
+    if (!area || !layout) return;
 
     const measure = () => {
+      // Width comes from .we-layout, not .we-board-area. The board area is a
+      // flex item with no flex-grow, so it shrink-wraps to the board inside
+      // it — measuring it would just read back whatever size the board
+      // already is, and the tile size would lock to its own starting value
+      // and never fill the space actually available.
+      let availableWidth = layout.clientWidth;
+
+      // On a wide screen the sidebar shares the flex line and takes part of
+      // it; on a phone it wraps below and the whole line is the board's.
+      // align-items:flex-start puts same-line items at a matching top edge.
+      const sidebar = layout.querySelector<HTMLElement>('.we-sidebar');
+      if (sidebar) {
+        const sidebarRect = sidebar.getBoundingClientRect();
+        const sharesLine = Math.abs(sidebarRect.top - area.getBoundingClientRect().top) < 4;
+        if (sharesLine) availableWidth -= sidebarRect.width + LAYOUT_GAP_PX;
+      }
+
       // visualViewport is what's actually on screen. innerHeight (and dvh) on
       // iOS measure against the toolbar-collapsed viewport, which is taller,
       // so the board would be sized for space it doesn't currently have.
       const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
       const maxHeightPx = Math.min(viewportHeight * BOARD_HEIGHT_FRACTION, BOARD_HEIGHT_CAP_PX);
 
-      const byWidth = (area.clientWidth - BOARD_PAD_PX * 2 - (G.width - 1) * TILE_GAP_PX) / G.width;
+      const byWidth = (availableWidth - BOARD_PAD_PX * 2 - (G.width - 1) * TILE_GAP_PX) / G.width;
       const byHeight = (maxHeightPx - BOARD_PAD_PX * 2 - (G.height - 1) * TILE_GAP_PX) / G.height;
       const fitTilePx = Math.max(
         FIT_MIN_TILE_PX,
@@ -256,8 +276,10 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     };
 
     measure();
+    // The layout is the element whose width actually tracks the viewport;
+    // the area's own size can stay put while the space around it changes.
     const observer = new ResizeObserver(measure);
-    observer.observe(area);
+    observer.observe(layout);
     window.visualViewport?.addEventListener('resize', measure);
     return () => {
       observer.disconnect();
