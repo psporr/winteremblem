@@ -1615,8 +1615,59 @@ body {
   color: #4ad991;
 }
 
-.we-popup--loot .we-popup__title {
-  margin-bottom: 6px;
+/* Item-get toast: a single line floating above the board, the way Fire
+   Emblem announces a drop instead of stopping play with a dialog. Fixed and
+   small — like .we-targeting-hint — so it never shifts the layout or blocks
+   the map underneath it while it fades in. */
+.we-loot-toast {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid #ffd479;
+  background: rgba(13, 20, 32, 0.88);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  opacity: 0;
+  animation: we-loot-toast-in 2000ms ease forwards;
+}
+
+.we-loot-toast__hint {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #ffd479;
+}
+
+@keyframes we-loot-toast-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .we-loot-toast {
+    animation-duration: 1ms;
+  }
 }
 
 @keyframes we-popup-in {

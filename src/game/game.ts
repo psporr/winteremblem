@@ -9,7 +9,7 @@ import { computeReachable, manhattan, tileKey, unitsOf } from './grid';
 import { canCounter, computeCounterDamage, computeDamage, forecastCombat } from './combat';
 import { BLESSINGS, drawBlessings } from './blessings';
 import { spawnWave } from './waves';
-import { EXP_PER_ATTACK, grantExp as grantExpToUnit } from './classes';
+import { EXP_PER_ATTACK, EXP_PER_HEAL, EXP_PER_KILL, grantExp as grantExpToUnit } from './classes';
 import { effectiveStats, equippedKillHeal, ITEMS, rollDrop, type DropRandomAPI } from './equipment';
 import { HEAL_BONUS, NOVA_DAMAGE_MULTIPLIER, SKILLS, SNIPE_BONUS, novaBlastTargets, skillTargets } from './skills';
 import { pushLog } from './log';
@@ -126,9 +126,9 @@ function resolveSkillCounter(G: GameState, attacker: Unit, target: Unit, random:
 }
 
 /** Only the player squad grows — enemy stats are fixed by wave/chapter, not combat performance. */
-function grantExp(G: GameState, unit: Unit): void {
+function grantExp(G: GameState, unit: Unit, amount: number = EXP_PER_ATTACK): void {
   if (unit.team !== 'player') return;
-  grantExpToUnit(unit, EXP_PER_ATTACK, (leveled) => pushLog(G, `${leveled.name} reached level ${leveled.level}!`));
+  grantExpToUnit(unit, amount, (leveled) => pushLog(G, `${leveled.name} reached level ${leveled.level}!`));
 }
 
 export const attackUnit = (
@@ -160,7 +160,7 @@ export const attackUnit = (
 
   // Reached only if the attacker survived (the attacker-dies branch above
   // returns early), so its exp/hp changes here always land on a live unit.
-  grantExp(G, attacker);
+  grantExp(G, attacker, result.willKill ? EXP_PER_KILL : EXP_PER_ATTACK);
   attacker.hasMoved = true;
   attacker.hasActed = true;
 };
@@ -190,6 +190,9 @@ export const useSkill = (
 
   const skill = SKILLS[unit.className];
   const target = targetId ? G.units[targetId] : undefined;
+  // Set by any case whose hit killed its target, so the shared exp grant at
+  // the bottom can credit a kill rather than a plain hit.
+  let killedTarget = false;
 
   switch (skill.id) {
     case 'heal': {
@@ -219,6 +222,7 @@ export const useSkill = (
       pushLog(G, `${unit.name} strikes ${target.name} twice for ${dealt}.`);
       if (target.hp <= 0) {
         killUnit(G, target, random, unit);
+        killedTarget = true;
       } else if (!resolveSkillCounter(G, unit, target, random)) {
         return;
       }
@@ -232,6 +236,7 @@ export const useSkill = (
       pushLog(G, `${unit.name} breaks ${target.name}'s guard for ${dmg}.`);
       if (target.hp <= 0) {
         killUnit(G, target, random, unit);
+        killedTarget = true;
       } else if (!resolveSkillCounter(G, unit, target, random)) {
         return;
       }
@@ -243,7 +248,10 @@ export const useSkill = (
       const dmg = computeDamage(G, unit, target) + SNIPE_BONUS;
       target.hp = Math.max(0, target.hp - dmg);
       pushLog(G, `${unit.name} snipes ${target.name} for ${dmg}. No counter possible.`);
-      if (target.hp <= 0) killUnit(G, target, random, unit);
+      if (target.hp <= 0) {
+        killUnit(G, target, random, unit);
+        killedTarget = true;
+      }
       break;
     }
 
@@ -255,7 +263,10 @@ export const useSkill = (
         const dmg = Math.max(1, Math.round(computeDamage(G, unit, hitTarget) * NOVA_DAMAGE_MULTIPLIER));
         hitTarget.hp = Math.max(0, hitTarget.hp - dmg);
         totalDealt += dmg;
-        if (hitTarget.hp <= 0) killUnit(G, hitTarget, random, unit);
+        if (hitTarget.hp <= 0) {
+          killUnit(G, hitTarget, random, unit);
+          killedTarget = true;
+        }
       }
       pushLog(
         G,
@@ -272,7 +283,7 @@ export const useSkill = (
       if (target.hp <= 0) {
         killUnit(G, target, random, unit);
         unit.skillCooldown = Math.max(1, skill.cooldown - G.modifiers.cooldownReduction);
-        grantExp(G, unit);
+        grantExp(G, unit, EXP_PER_KILL);
         // Deliberately leaves hasMoved/hasActed false — a kill refunds the turn.
         return;
       }
@@ -285,7 +296,7 @@ export const useSkill = (
   }
 
   unit.skillCooldown = Math.max(1, skill.cooldown - G.modifiers.cooldownReduction);
-  grantExp(G, unit);
+  grantExp(G, unit, skill.id === 'heal' ? EXP_PER_HEAL : killedTarget ? EXP_PER_KILL : EXP_PER_ATTACK);
   unit.hasMoved = true;
   unit.hasActed = true;
 };

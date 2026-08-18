@@ -153,6 +153,12 @@ type Popup =
 /** How long a level-up card stays up before dismissing itself. */
 const LEVEL_UP_POPUP_MS = 2600;
 
+/**
+ * How long the loot toast stays up before dismissing itself: 2s to fade in
+ * (see the CSS animation) plus a hold long enough to actually read it.
+ */
+const LOOT_TOAST_MS = 4200;
+
 /** How long the "Player Phase" / "Enemy Phase" banner sweeps for. */
 const PHASE_BANNER_MS = 1300;
 
@@ -418,8 +424,13 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   }, [G.awaitingBlessing]);
 
   // Drive the CPU one action at a time; each dispatch mutates G and re-runs this.
+  // Held off while the "Enemy Phase" banner is still on screen — otherwise
+  // the first hit lands while the banner is still announcing the phase that
+  // caused it. Re-runs once the banner clears (it's a dependency below), at
+  // which point the normal per-action delay takes over.
   useEffect(() => {
     if (ctx.gameover || G.awaitingBlessing || ctx.currentPlayer !== PLAYER_ID.enemy) return;
+    if (phaseBanner?.team === 'enemy') return;
 
     const timer = setTimeout(() => {
       const action = decideEnemyAction(G);
@@ -473,7 +484,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     }, ENEMY_ACTION_DELAY);
 
     return () => clearTimeout(timer);
-  }, [G, ctx.currentPlayer, ctx.gameover, moves, events]);
+  }, [G, ctx.currentPlayer, ctx.gameover, moves, events, phaseBanner]);
 
   const reachable = useMemo(
     () => (selected && isPlayerPhase && mode === 'move' ? computeReachable(G, selected) : EMPTY_REACHABLE),
@@ -992,10 +1003,12 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     setPopupQueue((queue) => queue.slice(1));
   }
 
-  // Level-up cards read themselves out and go; loot cards wait for a choice.
+  // Both card and toast read themselves out and dismiss on their own; a
+  // click still fast-forwards either one (level-up: dismiss, loot: equip).
   useEffect(() => {
-    if (visiblePopup?.kind !== 'levelUp') return;
-    const timer = window.setTimeout(dismissPopup, LEVEL_UP_POPUP_MS);
+    if (!visiblePopup) return;
+    const ms = visiblePopup.kind === 'levelUp' ? LEVEL_UP_POPUP_MS : LOOT_TOAST_MS;
+    const timer = window.setTimeout(dismissPopup, ms);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visiblePopup]);
@@ -2023,24 +2036,15 @@ function AnnouncementPopup({
   }
 
   const multiple = popup.itemNames.length > 1;
+  // Fire Emblem's item-get toast: a single line that fades in over the map
+  // rather than a modal blocking it. Tapping it opens equipment; leaving it
+  // alone lets it dismiss itself (see the auto-dismiss timer for 'loot').
   return (
-    <div className="we-overlay">
-      <div className="we-overlay__card we-popup we-popup--loot" role="dialog" aria-modal="true">
-        <p className="we-popup__eyebrow">{multiple ? 'Items found' : 'Item found'}</p>
-        <h2 className="we-popup__title">{popup.itemNames.join(', ')}</h2>
-        <p className="we-popup__sub">
-          Added to your inventory. Equip it now, or carry on and sort your gear later.
-        </p>
-        <div className="we-overlay__actions">
-          <button type="button" className="we-button" onClick={onOpenEquipment}>
-            Open equipment
-          </button>
-          <button type="button" className="we-button we-button--ghost" onClick={onDismiss}>
-            Continue
-          </button>
-        </div>
-      </div>
-    </div>
+    <button type="button" className="we-loot-toast" onClick={onOpenEquipment} title="Open equipment">
+      Got {popup.itemNames.join(', ')}
+      {multiple ? '' : '!'}
+      <span className="we-loot-toast__hint">tap to equip</span>
+    </button>
   );
 }
 

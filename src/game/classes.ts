@@ -62,8 +62,10 @@ export const LEVEL_GROWTH = { atk: 1, def: 1, maxHp: 2 };
 /** The player squad starts stronger than a fresh wave-1 recruit. */
 export const PLAYER_START_LEVEL = 5;
 
-/** How much EXP landing an attack grants, and how much a level costs. */
+/** How much EXP landing an attack, a kill, or a heal grants, and how much a level costs. */
 export const EXP_PER_ATTACK = 20;
+export const EXP_PER_KILL = 50;
+export const EXP_PER_HEAL = 50;
 export const EXP_TO_LEVEL = 100;
 
 /**
