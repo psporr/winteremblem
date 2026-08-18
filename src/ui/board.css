@@ -836,6 +836,78 @@ body {
   gap: 8px;
 }
 
+/* ---------------------------------------------------------------------------
+   Story dialogue (chapter intro/outro, mid-battle beats)
+   --------------------------------------------------------------------------- */
+
+/* Sits on .we-overlay's dark backdrop, full screen, blocking board input
+   until dismissed — a cutscene, not a toast. */
+.we-dialogue {
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px;
+  cursor: pointer;
+  /* Above every other overlay (toasts at 30, targeting hint at 30) — a
+     cutscene always wins the stack. */
+  z-index: 40;
+}
+
+.we-dialogue__card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  max-width: 480px;
+  width: 100%;
+  padding: 20px 24px;
+  border-radius: 14px;
+  border: 1px solid var(--panel-edge);
+  background: var(--panel);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+  animation: we-popup-in 220ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+/* A right-side speaker (an enemy, typically) mirrors the layout so the
+   portrait still reads as "facing" the left-side cast across the card. */
+.we-dialogue__card--right {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.we-dialogue__portrait {
+  flex-shrink: 0;
+}
+
+.we-dialogue__body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.we-dialogue__speaker {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.we-dialogue__text {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.we-dialogue__hint {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--ink-dim);
+}
+
 /* Anchored to the selected unit's tile; the actual card offsets to whichever
    side keeps it on the board, flipping near the edge. */
 .we-panel-anchor {

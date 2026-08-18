@@ -23,6 +23,9 @@ import { decideEnemyAction } from '../game/ai';
 import { BLESSINGS } from '../game/blessings';
 import { EXP_TO_LEVEL, LEVEL_GROWTH, type ClassName } from '../game/classes';
 import { effectiveStats, ITEMS } from '../game/equipment';
+import { CAMPAIGN_CHAPTERS } from '../game/maps';
+import { isTriggerMet, type DialogueScript } from '../game/story';
+import { DialogueOverlay } from './DialogueOverlay';
 import {
   HEAL_BONUS,
   NOVA_DAMAGE_MULTIPLIER,
@@ -204,6 +207,32 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   /** `seq` re-keys the element so the sweep replays on back-to-back phases. */
   const [phaseBanner, setPhaseBanner] = useState<{ team: Team; seq: number } | null>(null);
   /**
+   * How many times each team's phase has begun this battle, 1-indexed.
+   * Drives `turnReached` story triggers; kept as UI state rather than in G
+   * since it's not a rule, just a count derived from phase handoffs.
+   */
+  const [turnCounts, setTurnCounts] = useState<Record<Team, number>>(() => ({
+    player: teamOf(ctx.currentPlayer) === 'player' ? 1 : 0,
+    enemy: teamOf(ctx.currentPlayer) === 'enemy' ? 1 : 0,
+  }));
+  /**
+   * The chapter's own story data, looked up once from its id — G only
+   * carries the display strings (name/objective), not the full authored
+   * script, so the definition itself has to be found here.
+   */
+  const chapterDef = useMemo(
+    () => (G.mode === 'campaign' ? CAMPAIGN_CHAPTERS.find((candidate) => candidate.id === G.chapterId) : undefined),
+    [G.mode, G.chapterId],
+  );
+  /**
+   * The dialogue currently on screen — a chapter intro/outro or a mid-battle
+   * beat. Non-null blocks board input and the enemy AI the same way a
+   * popup does, but full-screen: this is a cutscene, not a toast.
+   */
+  const [activeScript, setActiveScript] = useState<DialogueScript | null>(() => chapterDef?.intro ?? null);
+  /** Which of the chapter's mid-battle events have already played. */
+  const [firedEventIds, setFiredEventIds] = useState<Set<string>>(() => new Set<string>());
+  /**
    * The unit currently leaning toward whoever it's striking this beat, and
    * how far. `crit` adds an extra punch-in scale on top of the lean, for a
    * skill or attack that landed a critical hit.
@@ -342,6 +371,8 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     if (ctx.currentPlayer === PLAYER_ID.player) sound.play('turn');
     phaseSeqRef.current += 1;
     setPhaseBanner({ team: teamOf(ctx.currentPlayer), seq: phaseSeqRef.current });
+    const newTeam = teamOf(ctx.currentPlayer);
+    setTurnCounts((counts) => ({ ...counts, [newTeam]: counts[newTeam] + 1 }));
     const timer = window.setTimeout(() => setPhaseBanner(null), PHASE_BANNER_MS);
     return () => window.clearTimeout(timer);
   }, [ctx.currentPlayer, ctx.gameover]);
@@ -427,10 +458,13 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   // Held off while the "Enemy Phase" banner is still on screen — otherwise
   // the first hit lands while the banner is still announcing the phase that
   // caused it. Re-runs once the banner clears (it's a dependency below), at
-  // which point the normal per-action delay takes over.
+  // which point the normal per-action delay takes over. Also held off for a
+  // story beat mid-enemy-phase: a cutscene should actually pause the CPU,
+  // not play out behind it.
   useEffect(() => {
     if (ctx.gameover || G.awaitingBlessing || ctx.currentPlayer !== PLAYER_ID.enemy) return;
     if (phaseBanner?.team === 'enemy') return;
+    if (activeScript) return;
 
     const timer = setTimeout(() => {
       const action = decideEnemyAction(G);
@@ -484,7 +518,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     }, ENEMY_ACTION_DELAY);
 
     return () => clearTimeout(timer);
-  }, [G, ctx.currentPlayer, ctx.gameover, moves, events, phaseBanner]);
+  }, [G, ctx.currentPlayer, ctx.gameover, moves, events, phaseBanner, activeScript]);
 
   const reachable = useMemo(
     () => (selected && isPlayerPhase && mode === 'move' ? computeReachable(G, selected) : EMPTY_REACHABLE),
@@ -996,7 +1030,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
    * the inventory only opens on the player's own phase. Queued cards simply
    * surface the moment the phase flips back.
    */
-  const popupsReady = isPlayerPhase && !G.awaitingBlessing && !gameover && mode !== 'animating';
+  const popupsReady = isPlayerPhase && !G.awaitingBlessing && !gameover && mode !== 'animating' && !activeScript;
   const visiblePopup = popupsReady ? (popupQueue[0] ?? null) : null;
 
   function dismissPopup() {
@@ -1019,6 +1053,39 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     setInventoryOpen(true);
     dismissPopup();
   }
+
+  function handleDialogueComplete() {
+    sound.play('confirm');
+    setActiveScript(null);
+  }
+
+  /**
+   * Mid-battle story beats. Held to the same "safe moment" gate a popup
+   * uses — no beat animation in flight, nothing else already on screen —
+   * but not to isPlayerPhase, since a beat can and should interrupt the
+   * enemy phase (see the CPU-pausing guard above).
+   */
+  useEffect(() => {
+    if (!chapterDef?.events?.length) return;
+    if (activeScript || visiblePopup || gameover || G.awaitingBlessing || mode === 'animating') return;
+
+    const next = chapterDef.events.find(
+      (event) => !firedEventIds.has(event.id) && isTriggerMet(event.trigger, G, { turnCounts }),
+    );
+    if (!next) return;
+
+    setFiredEventIds((prev) => new Set(prev).add(next.id));
+    setActiveScript(next.script);
+  }, [chapterDef, G, turnCounts, activeScript, visiblePopup, gameover, mode, firedEventIds]);
+
+  /** The chapter's outro plays once, right on victory, before the Play again / Main menu card. */
+  const outroShownRef = useRef(false);
+  useEffect(() => {
+    if (gameover?.winner === 'player' && chapterDef?.outro && !outroShownRef.current) {
+      outroShownRef.current = true;
+      setActiveScript(chapterDef.outro);
+    }
+  }, [gameover, chapterDef]);
 
   return (
     <div className="we-app">
@@ -1438,7 +1505,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
         </div>
       )}
 
-      {gameover && (
+      {gameover && !activeScript && (
         <div className="we-overlay">
           <div className="we-overlay__card">
             <h2>{gameover.winner === 'player' ? 'Victory' : 'Defeat'}</h2>
@@ -1474,6 +1541,12 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
           </div>
         </div>
       )}
+
+      {/* Last in the tree so a story beat always paints over any other
+          overlay it happens to land alongside — a chapter outro over the
+          victory card, a mid-battle beat over a popup that was just about
+          to show. */}
+      {activeScript && <DialogueOverlay script={activeScript} onComplete={handleDialogueComplete} />}
     </div>
   );
 }

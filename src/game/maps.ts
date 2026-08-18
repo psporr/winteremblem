@@ -1,5 +1,6 @@
 import type { GameMode, GameState, ObjectiveType, Team, TerrainType, Unit } from './types';
 import { ALL_CLASSES, PLAYER_START_LEVEL, statsAtLevel, type ClassName } from './classes';
+import type { DialogueScript, MapEvent } from './story';
 
 /**
  * The slice of boardgame.io's RandomAPI we actually need. Defined locally
@@ -54,6 +55,12 @@ export interface ChapterDef {
   objectiveType: ObjectiveType;
   rows: string[];
   units: UnitSpec[];
+  /** Shown once, full-screen, before the battle becomes playable. Roguelike chapters have none. */
+  intro?: DialogueScript;
+  /** Shown once the objective is cleared, before returning to chapter select. */
+  outro?: DialogueScript;
+  /** Story beats that can interrupt play once their trigger condition is met. */
+  events?: MapEvent[];
 }
 
 function parseTiles(rows: string[]): TerrainType[][] {
@@ -214,6 +221,27 @@ export const CAMPAIGN_CHAPTER_1: ChapterDef = {
   shortName: 'The Iron Gate',
   objective: 'Defeat all enemies',
   objectiveType: 'rout',
+  intro: [
+    { speaker: 'Lyn', portraitClass: 'Swordsman', text: 'That wall ahead is the Iron Gate. Whoever holds it controls the whole pass.' },
+    { speaker: 'Corrin', portraitClass: 'Lancer', text: "And right now that's a garrison that isn't expecting company." },
+    { speaker: 'Lissa', portraitClass: 'Cleric', text: "Then let's make sure they regret that. I'll keep everyone standing." },
+    { speaker: 'Lyn', portraitClass: 'Swordsman', text: 'Two chokepoints, archers on the walls. Watch your approach — we go together.' },
+  ],
+  outro: [
+    { speaker: 'Corrin', portraitClass: 'Lancer', text: 'Gate secured. Whatever they were guarding, it was ours today.' },
+    { speaker: 'Lyn', portraitClass: 'Swordsman', text: "This was only the first line. There's a longer road past this ridge — the Long March, the scouts call it." },
+    { speaker: 'Lyn', portraitClass: 'Swordsman', text: "Rest while you can. We move again soon." },
+  ],
+  events: [
+    {
+      id: 'gate-chief-falls',
+      trigger: { type: 'unitDefeated', unitId: 'gate-chief' },
+      script: [
+        { speaker: 'Gate Chief', portraitClass: 'Barbarian', side: 'right', text: "The gate... was never meant to hold..." },
+        { speaker: 'Lyn', portraitClass: 'Swordsman', text: "Their chief's down. Stay sharp — the rest will scatter or dig in." },
+      ],
+    },
+  ],
   rows: [
     '..###..',
     '.......',
@@ -261,6 +289,48 @@ export const CAMPAIGN_CHAPTER_2: ChapterDef = {
   shortName: 'The Long March',
   objective: 'Defeat all enemies',
   objectiveType: 'rout',
+  intro: [
+    { speaker: 'Lyn', portraitClass: 'Swordsman', text: "This is the vale the scouts warned us about. Three bands of wall, garrison dug into all of them." },
+    { speaker: 'Selva', portraitClass: 'Mage', text: "I'm reading at least one adept among them. Save your charges for whoever's holding the center." },
+    { speaker: 'Ake', portraitClass: 'Barbarian', text: "Long march, they call it. Feels more like a long line of people about to have a bad day." },
+    { speaker: 'Lyn', portraitClass: 'Swordsman', text: "Stay together at the gaps. We push through band by band." },
+  ],
+  outro: [
+    { speaker: 'Lyn', portraitClass: 'Swordsman', text: "The vale's ours. Whatever they were massing here, it stops today." },
+    { speaker: 'Corrin', portraitClass: 'Lancer', text: "Two gates down. I'd like to say it gets easier from here." },
+    { speaker: 'Lyn', portraitClass: 'Swordsman', text: "It won't. But neither will we." },
+  ],
+  events: [
+    {
+      id: 'march-second-wave',
+      trigger: { type: 'turnReached', team: 'enemy', turn: 2 },
+      script: [
+        { speaker: 'Vale Captain', portraitClass: 'Barbarian', side: 'right', text: "They're already past the outer wall? Signal the inner bands — hold nothing back." },
+      ],
+    },
+    {
+      id: 'march-breach-center',
+      trigger: { type: 'unitReachesTile', x: 5, y: 9, team: 'player' },
+      script: [
+        { speaker: 'Corrin', portraitClass: 'Lancer', text: "We're through the center band. The vale opens up from here." },
+      ],
+    },
+    {
+      id: 'march-garrison-thinning',
+      trigger: { type: 'enemyCountAtMost', count: 4 },
+      script: [
+        { speaker: 'Selva', portraitClass: 'Mage', text: "Their line's breaking. Just the captain and a handful left holding the far wall." },
+      ],
+    },
+    {
+      id: 'march-captain-falls',
+      trigger: { type: 'unitDefeated', unitId: 'march-captain' },
+      script: [
+        { speaker: 'Vale Captain', portraitClass: 'Barbarian', side: 'right', text: "Impossible... the vale was supposed to hold..." },
+        { speaker: 'Lyn', portraitClass: 'Swordsman', text: "Captain's down. Finish this and let's get everyone home." },
+      ],
+    },
+  ],
   rows: [
     '..##...##..',
     '...........',
