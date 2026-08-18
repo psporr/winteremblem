@@ -1,7 +1,7 @@
 import type { Ctx, Game, MoveMap } from 'boardgame.io';
 import { INVALID_MOVE } from 'boardgame.io/core';
 
-import type { ChapterDef } from './maps';
+import type { CampaignCarryOver, ChapterDef } from './maps';
 import type { GameMode, GameState, ItemSlot, Team, Unit } from './types';
 import { PLAYER_ID, teamOf } from './types';
 import { buildGameState, CAMPAIGN_CHAPTER_1, CHAPTER_1, type ShuffleAPI } from './maps';
@@ -398,10 +398,14 @@ export interface GameOver {
  * chapter loads and what counts as clearing it, so they're the same Game
  * definition built with different setup data rather than two engines.
  */
-export function createWinterEmblem(mode: GameMode, chapter: ChapterDef): Game<GameState> {
+export function createWinterEmblem(
+  mode: GameMode,
+  chapter: ChapterDef,
+  carryOver?: CampaignCarryOver,
+): Game<GameState> {
   return {
     ...WinterEmblemBase,
-    setup: ({ random }) => buildGameState(chapter, mode, random),
+    setup: ({ random }) => buildGameState(chapter, mode, random, carryOver),
   };
 }
 

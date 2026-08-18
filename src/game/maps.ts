@@ -1,6 +1,20 @@
-import type { GameMode, GameState, ObjectiveType, Team, TerrainType, Unit } from './types';
+import type { EquipmentSlots, GameMode, GameState, Item, ObjectiveType, Team, TerrainType, Unit } from './types';
 import { ALL_CLASSES, PLAYER_START_LEVEL, statsAtLevel, type ClassName } from './classes';
 import type { DialogueScript, MapEvent } from './story';
+
+/**
+ * What a player squad carries from one campaign chapter into the next:
+ * level/exp/equipment per surviving unit (keyed by the unit id shared
+ * across every chapter's roster) plus the shared inventory. A unit id with
+ * no entry here just starts that chapter at its authored defaults — covers
+ * both a fallen unit (rejoins fresh rather than staying dead across
+ * chapters) and a unit new to a later chapter.
+ */
+export interface CampaignCarryOver {
+  units: Record<string, { level: number; exp: number; equipment: EquipmentSlots }>;
+  inventory: Item[];
+  nextItemInstance: number;
+}
 
 /**
  * The slice of boardgame.io's RandomAPI we actually need. Defined locally
@@ -83,7 +97,12 @@ function parseTiles(rows: string[]): TerrainType[][] {
  * `ALL_CLASSES.length` random units gets balanced, no-duplicate coverage
  * that's still shuffled differently every battle.
  */
-export function buildGameState(chapter: ChapterDef, mode: GameMode, random: ShuffleAPI): GameState {
+export function buildGameState(
+  chapter: ChapterDef,
+  mode: GameMode,
+  random: ShuffleAPI,
+  carryOver?: CampaignCarryOver,
+): GameState {
   const tiles = parseTiles(chapter.rows);
   const width = tiles[0]?.length ?? 0;
 
@@ -98,8 +117,13 @@ export function buildGameState(chapter: ChapterDef, mode: GameMode, random: Shuf
   for (const spec of chapter.units) {
     const className =
       'className' in spec ? spec.className : shuffledClasses[nextRandomClassIndex++ % shuffledClasses.length];
+    // A unit carried over from a previous campaign chapter picks up where it
+    // left off; anyone else — roguelike, a fresh campaign chapter, a unit
+    // that fell and wasn't in the carry-over — starts at its authored
+    // default. Enemies never carry over.
+    const carried = spec.team === 'player' ? carryOver?.units[spec.id] : undefined;
     // The squad starts battle-tested; a fresh wave-1 enemy hasn't seen combat yet.
-    const level = spec.team === 'player' ? PLAYER_START_LEVEL : 1;
+    const level = carried?.level ?? (spec.team === 'player' ? PLAYER_START_LEVEL : 1);
     const stats = statsAtLevel(className, level);
 
     units[spec.id] = {
@@ -124,8 +148,8 @@ export function buildGameState(chapter: ChapterDef, mode: GameMode, random: Shuf
       hasMoved: false,
       hasActed: false,
       level,
-      exp: 0,
-      equipment: {},
+      exp: carried?.exp ?? 0,
+      equipment: carried?.equipment ?? {},
       skillCooldown: 0,
     };
   }
@@ -145,8 +169,8 @@ export function buildGameState(chapter: ChapterDef, mode: GameMode, random: Shuf
     log: [mode === 'campaign' ? chapter.name : 'Wave 1 Starts'],
     wave: 1,
     awaitingBlessing: false,
-    inventory: [],
-    nextItemInstance: 0,
+    inventory: carryOver?.inventory ?? [],
+    nextItemInstance: carryOver?.nextItemInstance ?? 0,
     modifiers: {
       counterBonus: 0,
       cooldownReduction: 0,

@@ -185,6 +185,8 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
    * as-is rather than needing separate "player AI" logic.
    */
   const [autoMode, setAutoMode] = useState(false);
+  /** The header's Main menu button asks before leaving — it abandons the battle in progress. */
+  const [confirmExit, setConfirmExit] = useState(false);
   const [combatAnim, setCombatAnim] = useState<CombatAnim | null>(null);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [inventoryUnitId, setInventoryUnitId] = useState<string | null>(null);
@@ -230,6 +232,12 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     () => (G.mode === 'campaign' ? CAMPAIGN_CHAPTERS.find((candidate) => candidate.id === G.chapterId) : undefined),
     [G.mode, G.chapterId],
   );
+  /** The chapter after this one, if any — drives the victory screen's Continue button. */
+  const nextChapterDef = useMemo(() => {
+    if (G.mode !== 'campaign') return undefined;
+    const index = CAMPAIGN_CHAPTERS.findIndex((candidate) => candidate.id === G.chapterId);
+    return index >= 0 ? CAMPAIGN_CHAPTERS[index + 1] : undefined;
+  }, [G.mode, G.chapterId]);
   /**
    * The dialogue currently on screen — a chapter intro/outro or a mid-battle
    * beat. Non-null blocks board input and the enemy AI the same way a
@@ -250,7 +258,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   const boardRef = useRef<HTMLDivElement | null>(null);
   const boardAreaRef = useRef<HTMLDivElement | null>(null);
   const boardWrapRef = useRef<HTMLDivElement | null>(null);
-  const { exitToMenu, retry } = useMenuActions();
+  const { exitToMenu, retry, continueCampaign } = useMenuActions();
 
   const isPlayerPhase =
     ctx.currentPlayer === PLAYER_ID.player && !ctx.gameover && !G.awaitingBlessing;
@@ -1085,6 +1093,26 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   }
 
   /**
+   * Carries the squad's level/exp/equipment and the shared inventory into
+   * the next chapter. Only surviving units get an entry — unitsOf filters
+   * out anyone in G.fallenUnits, so a fallen unit simply rejoins at that
+   * chapter's authored default next time rather than staying dead across
+   * chapters, which felt like the friendlier default for a "basic version"
+   * absent an explicit request for permadeath.
+   */
+  function handleContinueCampaign() {
+    if (!nextChapterDef) return;
+    sound.play('confirm');
+    continueCampaign(nextChapterDef.id, {
+      units: Object.fromEntries(
+        unitsOf(G, 'player').map((unit) => [unit.id, { level: unit.level, exp: unit.exp, equipment: unit.equipment }]),
+      ),
+      inventory: G.inventory,
+      nextItemInstance: G.nextItemInstance,
+    });
+  }
+
+  /**
    * Mid-battle story beats. Held to the same "safe moment" gate a popup
    * uses — no beat animation in flight, nothing else already on screen —
    * but not to isPlayerPhase, since a beat can and should interrupt the
@@ -1128,7 +1156,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
             title="Main menu"
             onClick={() => {
               sound.play('cancel');
-              exitToMenu();
+              setConfirmExit(true);
             }}
           >
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -1569,16 +1597,22 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                   : `Your company has been wiped out, having survived ${G.wave} wave${G.wave === 1 ? '' : 's'}.`}
             </p>
             <div className="we-overlay__actions">
-              <button
-                type="button"
-                className="we-button"
-                onClick={() => {
-                  sound.play('confirm');
-                  retry();
-                }}
-              >
-                {gameover.winner === 'player' ? 'Play again' : 'Retry'}
-              </button>
+              {gameover.winner === 'player' && nextChapterDef ? (
+                <button type="button" className="we-button" onClick={handleContinueCampaign}>
+                  Continue: {nextChapterDef.shortName}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="we-button"
+                  onClick={() => {
+                    sound.play('confirm');
+                    retry();
+                  }}
+                >
+                  {gameover.winner === 'player' ? 'Play again' : 'Retry'}
+                </button>
+              )}
               <button
                 type="button"
                 className="we-button we-button--ghost"
@@ -1588,6 +1622,38 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 }}
               >
                 Main menu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmExit && (
+        <div className="we-overlay">
+          <div className="we-overlay__card">
+            <h2>Leave battle?</h2>
+            <p>Progress in this battle will be lost.</p>
+            <div className="we-overlay__actions">
+              <button
+                type="button"
+                className="we-button"
+                onClick={() => {
+                  sound.play('cancel');
+                  setConfirmExit(false);
+                  exitToMenu();
+                }}
+              >
+                Leave
+              </button>
+              <button
+                type="button"
+                className="we-button we-button--ghost"
+                onClick={() => {
+                  sound.play('click');
+                  setConfirmExit(false);
+                }}
+              >
+                Stay
               </button>
             </div>
           </div>

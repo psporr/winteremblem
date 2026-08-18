@@ -1,10 +1,14 @@
 import { createContext, useContext } from 'react';
 
+import type { CampaignCarryOver } from '../game/maps';
+
 export interface MenuActions {
   /** Abandon the current battle and return to the title screen. */
   exitToMenu: () => void;
   /** Restart the current battle from the top, same mode and chapter. */
   retry: () => void;
+  /** Load the next campaign chapter, carrying the squad's level/exp/equipment/inventory into it. */
+  continueCampaign: (nextChapterId: string, progress: CampaignCarryOver) => void;
 }
 
 /**
@@ -16,6 +20,7 @@ export interface MenuActions {
 export const MenuActionsContext = createContext<MenuActions>({
   exitToMenu: () => {},
   retry: () => {},
+  continueCampaign: () => {},
 });
 
 export function useMenuActions(): MenuActions {
