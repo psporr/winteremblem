@@ -1,4 +1,5 @@
 import { CAMPAIGN_CHAPTERS } from '../game/maps';
+import type { CampaignSave } from '../game/save';
 import pkg from '../../package.json';
 import { MuteToggle } from './MuteToggle';
 import { sound } from './sound';
@@ -13,10 +14,18 @@ const GAME_VERSION = pkg.version;
 export function TitleScreen({
   onPlayRoguelike,
   onOpenCampaign,
+  savedGame,
+  onContinueSaved,
 }: {
   onPlayRoguelike: () => void;
+  /** New Game: always starts the campaign fresh, at whichever chapter is picked on the next screen. */
   onOpenCampaign: () => void;
+  /** Null when there's no save yet, or it's unreadable — the Continue option only renders when this is set. */
+  savedGame: CampaignSave | null;
+  onContinueSaved: () => void;
 }) {
+  const savedChapter = savedGame && CAMPAIGN_CHAPTERS.find((chapter) => chapter.id === savedGame.chapterId);
+
   return (
     <div className="we-title we-title--top">
       <MuteToggle className="we-iconbutton we-iconbutton--icon we-title__mute" />
@@ -25,6 +34,21 @@ export function TitleScreen({
           BIBI&rsquo;s <span>WinterEmblem</span>
         </h1>
         <p className="we-title__tagline">A turn-based tactics RPG</p>
+
+        {savedChapter && (
+          <button
+            type="button"
+            className="we-mode-card we-mode-card--continue"
+            onClick={() => {
+              sound.play('confirm');
+              onContinueSaved();
+            }}
+          >
+            <span className="we-mode-card__name">Continue</span>
+            <span className="we-mode-card__blurb">Resume your campaign at {savedChapter.name}.</span>
+            <span className="we-mode-card__meta">Squad carries its levels and gear from last time</span>
+          </button>
+        )}
 
         <div className="we-title__modes">
           <button
@@ -35,13 +59,15 @@ export function TitleScreen({
               onOpenCampaign();
             }}
           >
-            <span className="we-mode-card__name">Campaign</span>
+            <span className="we-mode-card__name">{savedChapter ? 'New Game' : 'Campaign'}</span>
             <span className="we-mode-card__blurb">
               Hand-crafted chapters, each with its own objective. Your squad carries its levels and gear
               forward.
             </span>
             <span className="we-mode-card__meta">
-              {CAMPAIGN_CHAPTERS.length} chapter{CAMPAIGN_CHAPTERS.length === 1 ? '' : 's'} available
+              {savedChapter
+                ? 'Starts over — your saved progress stays put until you clear a chapter'
+                : `${CAMPAIGN_CHAPTERS.length} chapter${CAMPAIGN_CHAPTERS.length === 1 ? '' : 's'} available`}
             </span>
           </button>
 

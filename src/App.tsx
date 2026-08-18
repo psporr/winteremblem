@@ -3,6 +3,7 @@ import { Client } from 'boardgame.io/react';
 
 import { createWinterEmblem } from './game/game';
 import { CAMPAIGN_CHAPTERS, CHAPTER_1, type CampaignCarryOver } from './game/maps';
+import { loadCampaignSave, saveCampaign, type CampaignSave } from './game/save';
 import type { GameMode } from './game/types';
 import { Board } from './ui/Board';
 import { ChapterSelect, TitleScreen } from './ui/TitleScreen';
@@ -31,6 +32,16 @@ export default function App() {
    * the player picked directly.
    */
   const [campaignProgress, setCampaignProgress] = useState<CampaignCarryOver | null>(null);
+  /**
+   * The on-disk (localStorage) save — separate from campaignProgress, which
+   * only lives for the current session. Read once at startup; updated
+   * every time continueCampaign writes a new one, so "Continue" on the
+   * title screen always reflects the latest chapter cleared without a
+   * reload. There's no manual save step: a save is written automatically
+   * at the one point that matters for a between-chapter save, continuing
+   * to the next chapter, since nothing else changes progress worth saving.
+   */
+  const [savedGame, setSavedGame] = useState<CampaignSave | null>(() => loadCampaignSave());
 
   const exitToMenu = useCallback(() => {
     setCampaignProgress(null);
@@ -45,6 +56,9 @@ export default function App() {
       retry: () => setScreen((current) => (current.kind === 'game' ? { ...current, runId: current.runId + 1 } : current)),
       continueCampaign: (nextChapterId, progress) => {
         setCampaignProgress(progress);
+        const save: CampaignSave = { chapterId: nextChapterId, carryOver: progress, savedAt: new Date().toISOString() };
+        saveCampaign(save);
+        setSavedGame(save);
         setScreen((current) => ({
           kind: 'game',
           mode: 'campaign',
@@ -78,6 +92,12 @@ export default function App() {
       <TitleScreen
         onPlayRoguelike={() => setScreen({ kind: 'game', mode: 'roguelike', chapterId: CHAPTER_1.id, runId: 0 })}
         onOpenCampaign={() => setScreen({ kind: 'chapter-select' })}
+        savedGame={savedGame}
+        onContinueSaved={() => {
+          if (!savedGame) return;
+          setCampaignProgress(savedGame.carryOver);
+          setScreen({ kind: 'game', mode: 'campaign', chapterId: savedGame.chapterId, runId: 0 });
+        }}
       />
     );
   }
