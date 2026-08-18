@@ -1359,6 +1359,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                       hpOverride={hpOverride}
                       shaking={shaking}
                       floatingNumber={floatingNumber}
+                      spent={unit.hasActed && unit.team === teamOf(ctx.currentPlayer)}
                     />
                   </div>
                 );
@@ -1982,12 +1983,21 @@ function UnitToken({
   hpOverride,
   shaking,
   floatingNumber,
+  spent,
 }: {
   unit: Unit;
   /** Shown instead of unit.hp while a confirmed attack is animating. */
   hpOverride?: number;
   shaking?: boolean;
   floatingNumber?: { value: number; kind: 'damage' | 'heal'; seq: number; crit: boolean } | null;
+  /**
+   * Greyed out as "already acted this turn". Only meaningful during that
+   * unit's own team's turn — hasActed on its own stays true on an enemy
+   * clear through the whole following player turn (it doesn't reset until
+   * that enemy's own next turn begins), which used to greyscale every enemy
+   * for the entire player phase from turn 2 onward.
+   */
+  spent?: boolean;
 }) {
   const displayedHp = hpOverride ?? unit.hp;
   const hpRatio = Math.max(0, displayedHp) / unit.maxHp;
@@ -1996,7 +2006,7 @@ function UnitToken({
   const classes = [
     'we-unit',
     `we-unit--${unit.team}`,
-    unit.hasActed ? 'we-unit--spent' : '',
+    spent ? 'we-unit--spent' : '',
     shaking ? 'we-unit--shake' : '',
   ].filter(Boolean);
 
