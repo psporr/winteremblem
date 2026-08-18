@@ -472,9 +472,12 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   // that caused it. Re-runs once the banner clears (it's a dependency
   // below), at which point the normal per-action delay takes over. Also
   // held off for a story beat: a cutscene should actually pause whichever
-  // side is auto-playing, not play out behind it.
+  // side is auto-playing, not play out behind it. Same for the equipment
+  // screen — reachable while Auto is on via a loot toast's "Open equipment"
+  // tap, and units acting behind that panel would be just as confusing as
+  // behind a cutscene.
   useEffect(() => {
-    if (ctx.gameover || G.awaitingBlessing || activeScript) return;
+    if (ctx.gameover || G.awaitingBlessing || activeScript || inventoryOpen) return;
     const currentTeam = teamOf(ctx.currentPlayer);
     const cpuControlled = currentTeam === 'enemy' || (currentTeam === 'player' && autoMode);
     if (!cpuControlled) return;
@@ -532,7 +535,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     }, ENEMY_ACTION_DELAY);
 
     return () => clearTimeout(timer);
-  }, [G, ctx.currentPlayer, ctx.gameover, moves, events, phaseBanner, activeScript, autoMode]);
+  }, [G, ctx.currentPlayer, ctx.gameover, moves, events, phaseBanner, activeScript, autoMode, inventoryOpen]);
 
   // Drop any manual selection the instant auto-play takes over the player's
   // turn, so a menu or reachable-tile highlight left over from before the
@@ -1089,7 +1092,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
    */
   useEffect(() => {
     if (!chapterDef?.events?.length) return;
-    if (activeScript || visiblePopup || gameover || G.awaitingBlessing || mode === 'animating') return;
+    if (activeScript || visiblePopup || gameover || G.awaitingBlessing || mode === 'animating' || inventoryOpen) return;
 
     const next = chapterDef.events.find(
       (event) => !firedEventIds.has(event.id) && isTriggerMet(event.trigger, G, { turnCounts }),
@@ -1098,7 +1101,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
 
     setFiredEventIds((prev) => new Set(prev).add(next.id));
     setActiveScript(next.script);
-  }, [chapterDef, G, turnCounts, activeScript, visiblePopup, gameover, mode, firedEventIds]);
+  }, [chapterDef, G, turnCounts, activeScript, visiblePopup, gameover, mode, firedEventIds, inventoryOpen]);
 
   /** The chapter's outro plays once, right on victory, before the Play again / Main menu card. */
   const outroShownRef = useRef(false);
@@ -1153,7 +1156,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
           {!ctx.gameover && (
             <button
               type="button"
-              className="we-iconbutton"
+              className="we-iconbutton we-iconbutton--icon"
               aria-pressed={autoMode}
               aria-label={`${autoMode ? 'Disable' : 'Enable'} auto-play for your turns`}
               title={`${autoMode ? 'Disable' : 'Enable'} auto-play for your turns`}
@@ -1162,7 +1165,15 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
                 setAutoMode((value) => !value);
               }}
             >
-              Auto
+              {autoMode ? (
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path fill="currentColor" d="M7 5h4v14H7zm6 0h4v14h-4z" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path fill="currentColor" d="M8 5v14l11-7z" />
+                </svg>
+              )}
             </button>
           )}
           {isPlayerPhase && !autoPlayingPlayerTurn && (
