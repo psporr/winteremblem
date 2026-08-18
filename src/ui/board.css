@@ -189,6 +189,13 @@ body {
   background: var(--panel-edge);
   border-radius: 10px;
   position: relative;
+  /* Size the box to the grid's own tracks. As an ordinary block-level grid
+     this would instead be capped at the scroll container's width while its
+     columns overflowed past it — leaving the panel background painting only
+     part of the way across (bare page showing behind the rest of the map),
+     and leaving .we-particles / .we-unit-layer, which are inset against this
+     box, too narrow to cover the tiles they're meant to sit over. */
+  width: max-content;
 
   /* Fit view — the largest tile that still shows the entire map at once.
      Both axes are considered so a tall map fits vertically too, and the

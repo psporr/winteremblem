@@ -180,6 +180,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   const particlesRef = useRef<ParticleBurstHandle | null>(null);
   const boardRef = useRef<HTMLDivElement | null>(null);
   const boardAreaRef = useRef<HTMLDivElement | null>(null);
+  const boardWrapRef = useRef<HTMLDivElement | null>(null);
   const { exitToMenu, retry } = useMenuActions();
 
   const isPlayerPhase =
@@ -542,7 +543,15 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
 
   function toggleZoom() {
     sound.play('click');
-    setZoomMode((current) => (current === 'fit' ? 'detail' : 'fit'));
+    setZoomMode((current) => {
+      const next = current === 'fit' ? 'detail' : 'fit';
+      // Returning to the fit view means "show me the whole map", so start it
+      // from the origin rather than wherever the detail view was panned to.
+      // Also belt-and-braces against a browser leaving a stale scroll offset
+      // behind when the content it was scrolling suddenly gets smaller.
+      if (next === 'fit') boardWrapRef.current?.scrollTo({ left: 0, top: 0 });
+      return next;
+    });
   }
 
   function handleCancelTargeting() {
@@ -1050,7 +1059,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
               </button>
             </div>
           )}
-        <div className="we-board-wrap">
+        <div className="we-board-wrap" ref={boardWrapRef}>
           <div
             ref={boardRef}
             className={`we-board${zoomMode === 'detail' ? ' we-board--detail' : ''}`}
