@@ -13,11 +13,9 @@ const GAME_VERSION = pkg.version;
 export function TitleScreen({
   onPlayRoguelike,
   onOpenCampaign,
-  onPlayLargeMapDemo,
 }: {
   onPlayRoguelike: () => void;
   onOpenCampaign: () => void;
-  onPlayLargeMapDemo: () => void;
 }) {
   return (
     <div className="we-title we-title--top">
@@ -62,17 +60,6 @@ export function TitleScreen({
             <span className="we-mode-card__meta">One life, no continues</span>
           </button>
         </div>
-
-        <button
-          type="button"
-          className="we-title__experiment"
-          onClick={() => {
-            sound.play('confirm');
-            onPlayLargeMapDemo();
-          }}
-        >
-          Large map / zoom demo
-        </button>
 
         <p className="we-title__version">v{GAME_VERSION}</p>
       </div>

@@ -1,15 +1,17 @@
 :root {
-  /* Fills the viewport width on mobile rather than sitting at a fixed size:
-     100vw minus .we-app's horizontal padding (40px), .we-board's own padding
-     (16px), and the inter-tile gaps, divided across the map's columns.
-     --board-cols is set per-board from G.width so a wider map auto-fits
-     instead of assuming 7; the fallback keeps this sane if it's ever unset.
-     Clamped so it doesn't shrink below legible or grow past a comfortable
-     size on wider screens — a map too wide to fit at the minimum simply
-     scrolls, and the zoom control can shrink it further on purpose. */
-  --tile: clamp(40px, calc((100vw - 68px) / var(--board-cols, 7)), 64px);
+  /* Fallback only. The real per-board value is computed on .we-board, which
+     is where --board-cols/--board-rows are set — a custom property is
+     substituted where it's *declared*, so a formula living up here would
+     resolve those against :root (i.e. never see the map's real size). */
+  --tile: 46px;
   --tile-gap: 2px;
   --board-pad: 8px;
+  /* The size the 7x8 map naturally lands on for a phone, and therefore the
+     reference "comfortable" tile — the large map's zoomed-in view matches
+     it, so units read at the same scale on both map types. */
+  --tile-detail: 46px;
+  /* Ceiling for the fit view, so a small map on a desktop doesn't blow up. */
+  --tile-max: 64px;
   /* Unit art height as a multiple of the tile. Slightly over 1 so sprites
      overhang their tile a little, the way they did at the original fixed
      48px against a ~46px tile. */
@@ -187,6 +189,31 @@ body {
   background: var(--panel-edge);
   border-radius: 10px;
   position: relative;
+
+  /* Fit view — the largest tile that still shows the entire map at once.
+     Both axes are considered so a tall map fits vertically too, and the
+     height budget mirrors .we-board-wrap's own max-height. The subtractions
+     are .we-app's horizontal padding (40px), this element's padding, and
+     the inter-tile gaps. 100vw is capped at .we-app's max-width so a wide
+     desktop doesn't over-estimate the space actually available. */
+  --tile-fit: min(
+    calc(
+      (min(100vw, 1180px) - 40px - var(--board-pad) * 2 - (var(--board-cols) - 1) * var(--tile-gap)) /
+        var(--board-cols)
+    ),
+    calc(
+      (min(70dvh, 720px) - var(--board-pad) * 2 - (var(--board-rows) - 1) * var(--tile-gap)) / var(--board-rows)
+    )
+  );
+  --tile: clamp(20px, var(--tile-fit), var(--tile-max));
+}
+
+/* Detail view — a fixed comfortable tile regardless of map size, matching
+   what the small map renders at. Anything that no longer fits simply
+   scrolls, which is the point of the view. Declared after .we-board so it
+   wins on source order at equal specificity. */
+.we-board--detail {
+  --tile: var(--tile-detail);
 }
 
 /* Impact particles. Sits above the tiles but below .we-unit (z-index 1), so

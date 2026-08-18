@@ -123,26 +123,6 @@
   opacity: 0.75;
 }
 
-/* Deliberately understated — this is a dev-facing experiment, not a game
-   mode, so it shouldn't compete with the Campaign/Roguelike cards above it. */
-.we-title__experiment {
-  display: block;
-  margin: 12px auto 0;
-  padding: 5px 12px;
-  border: 1px dashed var(--ink-dim);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ink-dim);
-  font: inherit;
-  font-size: 12px;
-  opacity: 0.65;
-  cursor: pointer;
-}
-
-.we-title__experiment:hover {
-  opacity: 1;
-}
-
 .we-title__version {
   margin: 4px 0 0;
   text-align: center;
