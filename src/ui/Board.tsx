@@ -19,7 +19,7 @@ import {
   type ReachableTile,
 } from '../game/grid';
 import { canCounter, computeCounterDamage, computeDamage, forecastCombat, type CombatForecast } from '../game/combat';
-import { decideEnemyAction } from '../game/ai';
+import { decideAction } from '../game/ai';
 import { BLESSINGS } from '../game/blessings';
 import { EXP_TO_LEVEL, LEVEL_GROWTH, type ClassName } from '../game/classes';
 import { effectiveStats, ITEMS } from '../game/equipment';
@@ -179,6 +179,12 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   const [pendingTargetId, setPendingTargetId] = useState<string | null>(null);
   const [hoveredTargetId, setHoveredTargetId] = useState<string | null>(null);
   const [showThreat, setShowThreat] = useState(false);
+  /**
+   * Plays the player's own units the same way the CPU plays the enemy's —
+   * decideAction(G, team) is already team-agnostic, so this reuses it
+   * as-is rather than needing separate "player AI" logic.
+   */
+  const [autoMode, setAutoMode] = useState(false);
   const [combatAnim, setCombatAnim] = useState<CombatAnim | null>(null);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [inventoryUnitId, setInventoryUnitId] = useState<string | null>(null);
@@ -248,6 +254,8 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
 
   const isPlayerPhase =
     ctx.currentPlayer === PLAYER_ID.player && !ctx.gameover && !G.awaitingBlessing;
+  /** Auto mode driving the player's own phase — manual input is locked out while it runs. */
+  const autoPlayingPlayerTurn = autoMode && isPlayerPhase;
   const selected = selectedId ? G.units[selectedId] : undefined;
 
   function clearSelection() {
@@ -454,20 +462,26 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     if (G.awaitingBlessing && !prev) sound.play('waveClear');
   }, [G.awaitingBlessing]);
 
-  // Drive the CPU one action at a time; each dispatch mutates G and re-runs this.
-  // Held off while the "Enemy Phase" banner is still on screen — otherwise
-  // the first hit lands while the banner is still announcing the phase that
-  // caused it. Re-runs once the banner clears (it's a dependency below), at
-  // which point the normal per-action delay takes over. Also held off for a
-  // story beat mid-enemy-phase: a cutscene should actually pause the CPU,
-  // not play out behind it.
+  // Drive whichever side is under CPU control one action at a time; each
+  // dispatch mutates G and re-runs this. The enemy is always CPU-controlled
+  // on its own turn; the player's own turn only is when Auto is on —
+  // decideAction is already team-agnostic (decideEnemyAction used to be
+  // just `decideAction(G, 'enemy')`), so no separate "player AI" is needed.
+  // Held off while that team's phase banner is still on screen — otherwise
+  // the first action lands while the banner is still announcing the phase
+  // that caused it. Re-runs once the banner clears (it's a dependency
+  // below), at which point the normal per-action delay takes over. Also
+  // held off for a story beat: a cutscene should actually pause whichever
+  // side is auto-playing, not play out behind it.
   useEffect(() => {
-    if (ctx.gameover || G.awaitingBlessing || ctx.currentPlayer !== PLAYER_ID.enemy) return;
-    if (phaseBanner?.team === 'enemy') return;
-    if (activeScript) return;
+    if (ctx.gameover || G.awaitingBlessing || activeScript) return;
+    const currentTeam = teamOf(ctx.currentPlayer);
+    const cpuControlled = currentTeam === 'enemy' || (currentTeam === 'player' && autoMode);
+    if (!cpuControlled) return;
+    if (phaseBanner?.team === currentTeam) return;
 
     const timer = setTimeout(() => {
-      const action = decideEnemyAction(G);
+      const action = decideAction(G, currentTeam);
       if (!action) {
         events.endTurn?.();
         return;
@@ -518,7 +532,15 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
     }, ENEMY_ACTION_DELAY);
 
     return () => clearTimeout(timer);
-  }, [G, ctx.currentPlayer, ctx.gameover, moves, events, phaseBanner, activeScript]);
+  }, [G, ctx.currentPlayer, ctx.gameover, moves, events, phaseBanner, activeScript, autoMode]);
+
+  // Drop any manual selection the instant auto-play takes over the player's
+  // turn, so a menu or reachable-tile highlight left over from before the
+  // toggle doesn't sit stale on screen while the AI moves other units.
+  useEffect(() => {
+    if (autoPlayingPlayerTurn) clearSelection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPlayingPlayerTurn]);
 
   const reachable = useMemo(
     () => (selected && isPlayerPhase && mode === 'move' ? computeReachable(G, selected) : EMPTY_REACHABLE),
@@ -602,7 +624,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
   }
 
   function handleTileClick(x: number, y: number) {
-    if (!isPlayerPhase) return;
+    if (!isPlayerPhase || autoPlayingPlayerTurn) return;
     const clicked = unitAt(G, x, y);
 
     if (!selected) {
@@ -1128,7 +1150,22 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
               />
             </svg>
           </button>
-          {isPlayerPhase && (
+          {!ctx.gameover && (
+            <button
+              type="button"
+              className="we-iconbutton"
+              aria-pressed={autoMode}
+              aria-label={`${autoMode ? 'Disable' : 'Enable'} auto-play for your turns`}
+              title={`${autoMode ? 'Disable' : 'Enable'} auto-play for your turns`}
+              onClick={() => {
+                sound.play('click');
+                setAutoMode((value) => !value);
+              }}
+            >
+              Auto
+            </button>
+          )}
+          {isPlayerPhase && !autoPlayingPlayerTurn && (
             <button
               type="button"
               className="we-iconbutton we-iconbutton--icon"
@@ -1151,7 +1188,7 @@ export function Board({ G, ctx, moves, events, undo }: BoardProps<GameState>) {
               )}
             </button>
           )}
-          {isPlayerPhase && mode !== 'animating' && (
+          {isPlayerPhase && !autoPlayingPlayerTurn && mode !== 'animating' && (
             <button
               type="button"
               className="we-iconbutton we-iconbutton--icon"
