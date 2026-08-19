@@ -37,8 +37,11 @@ constrained by terrain cost, combat resolved on contact with counterattacks.
 
 Working title was *BIBI's WinterEmblem*; the rename in progress leans toward
 something ending in **"Tactics"** (candidates: *Frostmarch Tactics*, *Iron
-Gate Tactics*). Pick the final name before scaffolding, since it lands in
-`package.json`, the title screen, and the repo name.
+Gate Tactics*), with ***Project Selvaria*** also in play from a separate design
+pass — note *Selva* is already the Mage's name in the roster (§4), which makes
+it fit the world rather than sit outside it. Pick the final name before
+scaffolding, since it lands in `package.json`, the title screen, and the repo
+name.
 
 ### Two modes, one rule set
 
@@ -58,7 +61,7 @@ design decision — keep it.
 ## 3. Rules reference
 
 This section is the actual design. It is worth reimplementing faithfully —
-these numbers were playtested and balanced, and the headless simulator (§6)
+these numbers were playtested and balanced, and the headless simulator (§5)
 was used to confirm the roguelike loop survives 7+ waves.
 
 ### Classes
@@ -91,8 +94,7 @@ table.
 
 ### Combat
 
-Deterministic — **no hit rate, no random crits**. This was a conscious v1 call
-that made the game readable and the AI honest; revisit only deliberately.
+Damage itself is deterministic:
 
 ```
 damage = attacker.atk - (defender.def + terrainDefBonus)
@@ -103,8 +105,62 @@ damage = max(1, damage)          // never zero; prevents unbreakable stalls
   *defender's* range. A killing blow prevents any counter.
 - All damage flows through one `computeDamage` / `computeCounterDamage` /
   `forecastCombat` trio. `forecastCombat` is **pure** and is used by *both*
-  the UI preview panel and the enemy AI — so the number the player is shown
-  can never disagree with what actually happens. Preserve this property.
+  the UI preview panel and the enemy AI — so what the player is shown can
+  never disagree with what actually happens. **Preserve this property**; it
+  matters more, not less, now that outcomes are probabilistic.
+
+#### CHANGED FOR THE REBUILD: hit rate and criticals
+
+The old prototype had **no hit rate and no random crits** — every attack
+connected for an exact, previewable number. **The rebuild adds both.**
+
+This is a real design change, not a port. What it buys: classic Fire Emblem
+tension, meaningful positioning (terrain becomes evasion, not just armour),
+and drama in the combat overlay (§7). What it costs, all of which must be
+handled deliberately:
+
+- The forecast becomes a **probability**, not a number. The UI shows Hit% and
+  Crit% the way FE's combat forecast does.
+- The **AI must reason in expected value** (`damage × hitChance`), not raw
+  damage. Its current scoring is deterministic and needs reworking.
+- The **headless simulator needs batch runs** — a single run no longer says
+  anything about balance. Run N seeded battles and compare distributions.
+- **Every roll must go through the injected seeded RNG** (boardgame.io's).
+  This was already the rule, but it was low-stakes when combat was
+  deterministic. It is now load-bearing: a stray `Math.random()` in combat
+  breaks multiplayer sync and replays.
+
+**Proposed formula — confirm before implementing.** FE derives hit from
+*Skill*, avoid from *Speed*, and crit from *Skill*. Our stat model has none of
+those — only HP/Atk/Def/Move/Range. Two ways to close that gap:
+
+*Option A — flat per-class rates (proposed).* No new stats. Each class gets a
+base `hit` and `crit`; terrain gains an `avoid` bonus alongside its existing
+def bonus.
+
+```
+hitChance  = clamp(attacker.hit - defender.terrainAvoid, 5, 100)
+critChance = clamp(attacker.crit, 0, 100)
+critDamage = damage × 2          // 3× is the FE standard and may feel too swingy at our HP values
+```
+
+This is the smallest change that delivers the feel, and it immediately gives
+classes personality beyond stats: Archer accurate but rarely crits, Barbarian
+inaccurate but crits hard, Swordsman good at both. Forest becomes genuinely
+tactical in two dimensions.
+
+*Option B — add Skill and Speed stats.* More FE-authentic and opens the door
+to **follow-up attacks** (the FE rule where enough Speed advantage grants a
+second strike), but it means reworking the class table, the level curve, and
+every balance number. Larger change; defer unless the flat version feels flat.
+
+**Recommendation: start with Option A.** Speed/follow-ups can be added later
+as a deliberate second pass.
+
+*Worth knowing:* FE games use **2RN "true hit"** — averaging two random rolls
+so displayed hit rates above 50% land more often than stated, which feels
+markedly fairer than honest 1RN. Cheap to implement, and worth doing if 1RN
+tests badly.
 
 ### Terrain
 
@@ -181,6 +237,13 @@ the attacker, `−counterDamage`, `+2 × damage already taken` (finish the
 wounded). No attack available → move toward the nearest enemy. Nothing
 reachable → wait.
 
+**Needs rework for hit/crit (§3).** Those weights assume every attack lands.
+With hit rates, each term becomes an expectation — roughly
+`damage × hitChance` for the damage term, and the `+1000` kill bonus should
+scale by the chance the kill actually happens, or the AI will confidently
+throw units at 40%-hit "kills". Re-tune the weights against batch simulator
+runs rather than by eye.
+
 **The AI is team-agnostic** (`decideAction(state, team)`), which is what made
 the "Auto-play the player's turn" feature nearly free. Preserve that.
 
@@ -221,7 +284,7 @@ UI.
 
 **Story data lives outside the synced game state** — it's presentation, not
 rules, and doesn't need to be deterministic or network-replicated. This matters
-for multiplayer (§8).
+for multiplayer (§9).
 
 ---
 
@@ -234,7 +297,7 @@ a plain, JSON-serialisable state object. This paid off repeatedly:
 
 - The headless simulator could drive full battles with no browser.
 - The same `forecastCombat` served the UI and the AI with zero drift.
-- Multiplayer stays viable without a rewrite (§8).
+- Multiplayer stays viable without a rewrite (§9).
 
 **In Phaser, keep this line even harder.** Phaser makes it tempting to hang
 game logic off sprites. Don't — sprites should *read* game state, never own it.
@@ -264,11 +327,11 @@ A water tile dropped on a spawn point would otherwise silently brick that unit.
 
 | Old approach | Why it's wrong for Phaser | Use instead |
 | --- | --- | --- |
-| CSS-grid board, `background-position` sprite slicing | Fighting the browser layout engine for something a game engine does natively; source of *every* hard bug in §7 | Phaser Tilemaps + Camera |
+| CSS-grid board, `background-position` sprite slicing | Fighting the browser layout engine for something a game engine does natively; source of *every* hard bug in §8 | Phaser Tilemaps + Camera |
 | Hand-rolled canvas particle system (~230 lines) | Reimplements a solved problem | Phaser particle emitters |
 | `setTimeout`-driven animation "beats" | Fires in catch-up bursts after main-thread stalls; reads as sped-up animation | Phaser tweens + timeline |
 | Manual board shake / crit flash / phase tint | Bespoke CSS keyframes per effect | Phaser camera shake/flash/fade, filters |
-| Custom zoom (two discrete tile sizes, measured in JS) | Enormous complexity; see §7 | Phaser camera zoom |
+| Custom zoom (two discrete tile sizes, measured in JS) | Enormous complexity; see §8 | Phaser camera zoom |
 | Web Audio wrapper (~270 lines) | Hand-built pooling, gain trim, retrigger guard | Phaser sound manager |
 
 That table is roughly **1,200 lines of code that Phaser deletes**. The game
@@ -287,10 +350,10 @@ Keeping it means four things stay solved rather than becoming our problem:
 2. **A seeded PRNG behind an injected random API.** The old code never calls
    `Math.random()`; every roll goes through boardgame.io's seeded random.
    That injection is exactly what makes deterministic replay and multiplayer
-   sync possible (§8) — keeping the library keeps it for free.
+   sync possible (§9) — keeping the library keeps it for free.
 3. **State immutability** via immer, so moves read as plain mutation while
    producing new state.
-4. **A multiplayer transport** (§8) — the genuinely hard part, already built.
+4. **A multiplayer transport** (§9) — the genuinely hard part, already built.
 
 **The one thing to change: drop the React binding.** Import the vanilla client
 from `boardgame.io/client`, not `boardgame.io/react`. The old `scripts/simulate.ts`
@@ -310,7 +373,134 @@ view of it.
 
 ---
 
-## 7. Hard-won lessons
+## 7. Phaser architecture
+
+Merged from a separate technical design pass ("Project Selvaria"), reconciled
+with the decisions above. *Selvaria* is also live as a name candidate (§2).
+
+### Renderer
+
+Use Phaser 4's **`TilemapGPULayer`** for the grid — it's the new v4 path and
+the right tool for a tile board. See Phaser's own `v4-new-features` and
+`tilemaps` skills.
+
+Keep authoring maps as **ASCII** (§3) even though Phaser prefers Tiled JSON;
+convert ASCII → tilemap data at load or build time. The ASCII format is far
+better for hand-editing and diffing, and it's how all three existing maps are
+written.
+
+### Two state machines, not one — keep them separate
+
+This is the most important architectural note here, and the easiest thing to
+get wrong. There are **two** distinct machines, at different layers:
+
+| Layer | Owner | States |
+| --- | --- | --- |
+| **Game truth** | boardgame.io (§6) | player phase ↔ enemy phase, turn begin/end, victory/defeat |
+| **UI interaction** | The Phaser scene | `idle` → `unit-selected` → `moving` → `action-menu` → `targeting` → `confirming` → `animating` |
+
+The old project had exactly this split — boardgame.io owned turns, a separate
+`mode` value owned input flow — and it worked. Collapsing them into a single
+machine that mixes `PLAYER_START` with `ACTION_MENU` conflates authoritative
+state with view state, which is precisely how input bugs and desyncs start.
+
+The UI machine's job is to **lock input during animation and dispatch a move
+at the end**. It never decides whose turn it is.
+
+### Scenes
+
+- **`BootScene`** — asset preloading, atlases, audio decode.
+- **`TacticalScene`** — the grid, tilemap, unit sprites, movement/threat
+  overlays, action menu, input. Renders from `G`/`ctx`.
+- **`CombatOverlayScene`** — GBA-style 1v1 combat presentation (§ below).
+- **`UIScene`** *(suggested addition)* — persistent HUD, phase banners, popups,
+  dialogue. Keeping these off `TacticalScene` means camera zoom/pan on the grid
+  never drags the UI around with it. The old project spent real effort fixing
+  exactly that class of bug when banners scrolled with the board.
+
+### Combat presentation — deferred, but architected for
+
+**Decision: build on-grid combat first, add the overlay scene later.**
+
+Phase 1 (now): resolve combat on the tactical grid, as the old project did —
+floating damage numbers, attacker lunge, impact particles, screen shake, crit
+flash. Fast to build, needs no new art, and reads well on a phone.
+
+Phase 2 (later): a `CombatOverlayScene` with sliding portraits, health bars,
+and per-class attack animations, in the GBA Fire Emblem style. This is also
+the honest answer to "make it look like Awakening" — Awakening's 3D combat
+cutscenes aren't reachable in a 2D engine, but GBA-style 2D battle animations
+deliver the same *dramatic beat* and are entirely achievable.
+
+To keep phase 2 cheap to add later, hold this contract from day one:
+
+1. **Resolve the entire combat outcome before any animation plays** — the full
+   exchange, hit/miss/crit rolls included, resolved up front. The old project
+   already did this and it's why its animation system was reliable.
+2. **Presentation consumes a finished result.** Whatever plays the animation —
+   on-grid effects now, an overlay scene later — receives a resolved outcome
+   object and only visualises it. Swapping presentation must not touch combat
+   math.
+3. **Signal completion by event.** Presentation emits `COMBAT_FINISHED` when
+   its animation ends; the tactical layer then applies visible consequences
+   (death removal, HP bars) and unlocks input. With that seam in place, adding
+   the overlay scene later is a presentation swap, not a rewrite.
+
+### Pathfinding — keep Dijkstra, `easystarjs` is optional
+
+The technical design proposed `easystarjs` (A*). **A\* is the wrong tool for
+the primary job.** Tactical RPGs mostly need *range* — "every tile reachable
+within N move points" — which is a single Dijkstra flood-fill. Doing that with
+A* means one A* run per candidate tile.
+
+The existing `computeReachable` already solves this correctly, including our
+specific rules: variable terrain cost, allies passable-through-but-not-
+landable-on, enemies blocking entirely, and per-unit cost overrides (Forest
+Talisman). It also yields the cost map needed to reconstruct a walk path, so
+**a separate A* library may not be needed at all**. Port it; add `easystarjs`
+only if a concrete need appears.
+
+### Directory structure
+
+Extends the proposed layout with a home for the pure game core, which the
+original structure had nowhere to put:
+
+```text
+src/
+├── assets/              # sprites, atlases, audio, tilemap data
+├── game/                # PURE LOGIC — no Phaser import, ever
+│   ├── types.ts             # GameState, Unit, Terrain
+│   ├── classes.ts           # stat table, level curve, exp
+│   ├── combat.ts            # damage, hit/crit, forecast
+│   ├── grid.ts              # Dijkstra reachability, threat range
+│   ├── skills.ts            # 7 class skills
+│   ├── equipment.ts         # items, effective stats, drops
+│   ├── blessings.ts         # 20 roguelike buffs
+│   ├── waves.ts             # roguelike wave spawning
+│   ├── maps.ts              # ASCII chapter definitions
+│   ├── story.ts             # dialogue scripts, event triggers
+│   ├── save.ts              # campaign carry-over persistence
+│   ├── ai.ts                # stateless, team-agnostic
+│   └── game.ts              # boardgame.io Game: moves, turn, endIf
+├── scenes/
+│   ├── BootScene.ts
+│   ├── TacticalScene.ts
+│   ├── CombatOverlayScene.ts    # phase 2
+│   └── UIScene.ts
+├── entities/            # UnitSprite — a VIEW of a Unit, owns no truth
+├── systems/             # input handling, camera, storage interface
+├── scripts/simulate.ts  # headless AI-vs-AI runner (§5)
+└── main.ts              # Phaser config + Vite entry
+```
+
+**The `game/` boundary is the load-bearing rule**: nothing in it may import
+Phaser, and nothing in it may reach for `Math.random()` or `localStorage`.
+That single constraint is what keeps the headless simulator possible,
+multiplayer viable (§9), and the Capacitor wrap uneventful (§10).
+
+---
+
+## 8. Hard-won lessons
 
 These cost real time. Most are *not* Phaser-specific — they're about process.
 
@@ -374,7 +564,7 @@ These cost real time. Most are *not* Phaser-specific — they're about process.
 
 ---
 
-## 8. Planned: multiplayer
+## 9. Planned: multiplayer
 
 **Not yet built, explicitly deferred** ("let's do that later because I want to
 keep polishing single player first, but let's keep it in mind when
@@ -405,7 +595,7 @@ the obvious choice.
   onto receiving remote moves.
 - Keep AI stateless so it can run server-side for PvE-vs-AI or fill-in players.
 
-## 9. Planned: mobile app
+## 10. Planned: mobile app
 
 **Also future work.** The intent is to ship this as a **native mobile app**,
 not only a web page. Phaser 4 + **Capacitor** is the standard path to iOS and
@@ -417,7 +607,7 @@ The old project was already mobile-first and learned some of this the hard way:
   to suit a phone screen. Keep that constraint.
 - **Touch-first input.** Everything is tap-driven; there is no hover-dependent
   interaction, and hover is treated as a bonus rather than a requirement.
-- **The viewport lessons in §7 are mobile lessons** — Phaser's ScaleManager
+- **The viewport lessons in §8 are mobile lessons** — Phaser's ScaleManager
   handles most of this properly, but respect safe-area insets on notched
   devices.
 - **Tap targets** need a comfortable minimum size; the tile size floor
@@ -435,11 +625,11 @@ the eventual wrap is uneventful:
   interface rather than called directly from game code, so it can be swapped
   for Capacitor Preferences later without touching logic.
 - Keep testing at real phone viewports throughout, not just desktop — the
-  layout regressions in §7 were all found at phone widths.
+  layout regressions in §8 were all found at phone widths.
 
 ---
 
-## 10. Working conventions worth keeping
+## 11. Working conventions worth keeping
 
 - **Comments explain *why*, not *what*.** The old codebase's comments are
   unusually load-bearing — they record the reasoning behind non-obvious
@@ -455,7 +645,7 @@ the eventual wrap is uneventful:
 
 ---
 
-## 11. Suggested first steps in the new project
+## 12. Suggested first steps in the new project
 
 1. Decide the **name** (leaning toward something ending in "Tactics" — see §2).
 2. Scaffold Phaser 4 + TypeScript + Vite (Phaser publishes an official
@@ -466,14 +656,23 @@ the eventual wrap is uneventful:
    equipment, blessings, AI, plus the boardgame.io `Game` definition (moves,
    `turn`, `endIf`). No rendering at all. It's ~1,500 lines and carries over
    almost verbatim, since none of it was ever React-aware.
-6. **Rebuild the headless simulator and get it green** — before drawing a
+6. **Confirm the hit/crit formula (§3), then implement it.** This is the one
+   genuine rules change in the rebuild. Add `hit`/`crit` to the class table and
+   `avoid` to terrain, rework `forecastCombat` to return probabilities, and
+   re-tune the AI to expected value. Do it here, while the core is still
+   headless and cheap to iterate on.
+7. **Rebuild the headless simulator and get it green** — before drawing a
    single sprite. If the sim runs a full roguelike run, the core is correct.
    The old `scripts/simulate.ts` ports nearly as-is and doubles as the
-   reference for driving the vanilla client without React.
-7. *Then* start on the Phaser scene, tilemap, and unit sprites, rendering from
-   `G`/`ctx` and dispatching moves back.
-8. Rebuild map validation (BFS connectivity + spawn-tile checks) as a script.
+   reference for driving the vanilla client without React. **Add a batch mode**
+   (N seeded runs, aggregate win rates and wave depth) — with hit/crit, a
+   single run no longer says anything about balance.
+8. *Then* start on the Phaser scene, tilemap, and unit sprites, rendering from
+   `G`/`ctx` and dispatching moves back. On-grid combat presentation first;
+   `CombatOverlayScene` is phase 2 (§7).
+9. Rebuild map validation (BFS connectivity + spawn-tile checks) as a script.
 
-Doing 5–6 before 7 is the single most important sequencing call here. The old
-project's core logic is its most valuable asset, and it can be proven correct
-with zero graphics.
+Doing 5–7 before 8 is the single most important sequencing call here. The old
+project's core logic is its most valuable asset, it can be proven correct with
+zero graphics, and the hit/crit rebalance is far cheaper to iterate on in a
+terminal than through a rendered game.
