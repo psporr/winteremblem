@@ -163,8 +163,8 @@ artwork drawn for this project. See [CREDITS.md](CREDITS.md).
 
 - v1 (current): wave-survival on one 7x8 map (portrait, one column wider than
   Fire Emblem Heroes' standard grid; tile size is responsive so the board
-  fills the viewport without horizontal scrolling). Squad is Lyn (Swordsman),
-  Byleth (Archer), Corrin (Lancer), Selva (Mage), Ake (Barbarian), Lissa
+  fills the viewport without horizontal scrolling). Squad is Eirika (Swordsman),
+  Byleth (Archer), Corrin (Lancer), Selva (Mage), Ike (Barbarian), Lissa
   (Cleric), Olivia (Dancer) vs waves of randomly-classed, difficulty-scaled
   Bandits drawing from the same 7-class pool, local play. Every class has
   real sprite art and its own active skill from level 1. Drop-based

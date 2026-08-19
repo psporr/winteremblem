@@ -227,11 +227,11 @@ export const CHAPTER_1: ChapterDef = {
     '..##...',
   ],
   units: [
-    { id: 'lyn', name: 'Lyn', team: 'player', className: 'Swordsman', x: 1, y: 6 },
+    { id: 'lyn', name: 'Eirika', team: 'player', className: 'Swordsman', x: 1, y: 6 },
     { id: 'byleth', name: 'Byleth', team: 'player', className: 'Archer', x: 1, y: 7 },
     { id: 'corrin', name: 'Corrin', team: 'player', className: 'Lancer', x: 4, y: 6 },
     { id: 'selva', name: 'Selva', team: 'player', className: 'Mage', x: 4, y: 7 },
-    { id: 'ake', name: 'Ake', team: 'player', className: 'Barbarian', x: 2, y: 6 },
+    { id: 'ake', name: 'Ike', team: 'player', className: 'Barbarian', x: 2, y: 6 },
     { id: 'lissa', name: 'Lissa', team: 'player', className: 'Cleric', x: 3, y: 6 },
     { id: 'olivia', name: 'Olivia', team: 'player', className: 'Dancer', x: 5, y: 6 },
     { id: 'bandit-1', name: 'Bandit 1', team: 'enemy', randomClass: true, x: 1, y: 0 },
@@ -255,15 +255,15 @@ export const CAMPAIGN_CHAPTER_1: ChapterDef = {
   objective: 'Defeat all enemies',
   objectiveType: 'rout',
   intro: [
-    { speaker: 'Lyn', portraitClass: 'Swordsman', text: 'That wall ahead is the Iron Gate. Whoever holds it controls the whole pass.' },
+    { speaker: 'Eirika', portraitClass: 'Swordsman', text: 'That wall ahead is the Iron Gate. Whoever holds it controls the whole pass.' },
     { speaker: 'Corrin', portraitClass: 'Lancer', text: "And right now that's a garrison that isn't expecting company." },
     { speaker: 'Lissa', portraitClass: 'Cleric', text: "Then let's make sure they regret that. I'll keep everyone standing." },
-    { speaker: 'Lyn', portraitClass: 'Swordsman', text: 'Two chokepoints, archers on the walls. Watch your approach — we go together.' },
+    { speaker: 'Eirika', portraitClass: 'Swordsman', text: 'Two chokepoints, archers on the walls. Watch your approach — we go together.' },
   ],
   outro: [
     { speaker: 'Corrin', portraitClass: 'Lancer', text: 'Gate secured. Whatever they were guarding, it was ours today.' },
-    { speaker: 'Lyn', portraitClass: 'Swordsman', text: "This was only the first line. There's a longer road past this ridge — the Long March, the scouts call it." },
-    { speaker: 'Lyn', portraitClass: 'Swordsman', text: "Rest while you can. We move again soon." },
+    { speaker: 'Eirika', portraitClass: 'Swordsman', text: "This was only the first line. There's a longer road past this ridge — the Long March, the scouts call it." },
+    { speaker: 'Eirika', portraitClass: 'Swordsman', text: "Rest while you can. We move again soon." },
   ],
   events: [
     {
@@ -271,7 +271,7 @@ export const CAMPAIGN_CHAPTER_1: ChapterDef = {
       trigger: { type: 'unitDefeated', unitId: 'gate-chief' },
       script: [
         { speaker: 'Gate Chief', portraitClass: 'Barbarian', side: 'right', text: "The gate... was never meant to hold..." },
-        { speaker: 'Lyn', portraitClass: 'Swordsman', text: "Their chief's down. Stay sharp — the rest will scatter or dig in." },
+        { speaker: 'Eirika', portraitClass: 'Swordsman', text: "Their chief's down. Stay sharp — the rest will scatter or dig in." },
       ],
     },
   ],
@@ -286,8 +286,8 @@ export const CAMPAIGN_CHAPTER_1: ChapterDef = {
     '...#...',
   ],
   units: [
-    { id: 'lyn', name: 'Lyn', team: 'player', className: 'Swordsman', x: 1, y: 6 },
-    { id: 'ake', name: 'Ake', team: 'player', className: 'Barbarian', x: 2, y: 6 },
+    { id: 'lyn', name: 'Eirika', team: 'player', className: 'Swordsman', x: 1, y: 6 },
+    { id: 'ake', name: 'Ike', team: 'player', className: 'Barbarian', x: 2, y: 6 },
     { id: 'lissa', name: 'Lissa', team: 'player', className: 'Cleric', x: 3, y: 6 },
     { id: 'corrin', name: 'Corrin', team: 'player', className: 'Lancer', x: 4, y: 6 },
     { id: 'olivia', name: 'Olivia', team: 'player', className: 'Dancer', x: 5, y: 6 },
@@ -323,15 +323,15 @@ export const CAMPAIGN_CHAPTER_2: ChapterDef = {
   objective: 'Defeat all enemies',
   objectiveType: 'rout',
   intro: [
-    { speaker: 'Lyn', portraitClass: 'Swordsman', text: "This is the vale the scouts warned us about. Three bands of wall, garrison dug into all of them." },
+    { speaker: 'Eirika', portraitClass: 'Swordsman', text: "This is the vale the scouts warned us about. Three bands of wall, garrison dug into all of them." },
     { speaker: 'Selva', portraitClass: 'Mage', text: "I'm reading at least one adept among them. Save your charges for whoever's holding the center." },
-    { speaker: 'Ake', portraitClass: 'Barbarian', text: "Long march, they call it. Feels more like a long line of people about to have a bad day." },
-    { speaker: 'Lyn', portraitClass: 'Swordsman', text: "Stay together at the gaps. We push through band by band." },
+    { speaker: 'Ike', portraitClass: 'Barbarian', text: "Long march, they call it. Feels more like a long line of people about to have a bad day." },
+    { speaker: 'Eirika', portraitClass: 'Swordsman', text: "Stay together at the gaps. We push through band by band." },
   ],
   outro: [
-    { speaker: 'Lyn', portraitClass: 'Swordsman', text: "The vale's ours. Whatever they were massing here, it stops today." },
+    { speaker: 'Eirika', portraitClass: 'Swordsman', text: "The vale's ours. Whatever they were massing here, it stops today." },
     { speaker: 'Corrin', portraitClass: 'Lancer', text: "Two gates down. I'd like to say it gets easier from here." },
-    { speaker: 'Lyn', portraitClass: 'Swordsman', text: "It won't. But neither will we." },
+    { speaker: 'Eirika', portraitClass: 'Swordsman', text: "It won't. But neither will we." },
   ],
   events: [
     {
@@ -360,7 +360,7 @@ export const CAMPAIGN_CHAPTER_2: ChapterDef = {
       trigger: { type: 'unitDefeated', unitId: 'march-captain' },
       script: [
         { speaker: 'Vale Captain', portraitClass: 'Barbarian', side: 'right', text: "Impossible... the vale was supposed to hold..." },
-        { speaker: 'Lyn', portraitClass: 'Swordsman', text: "Captain's down. Finish this and let's get everyone home." },
+        { speaker: 'Eirika', portraitClass: 'Swordsman', text: "Captain's down. Finish this and let's get everyone home." },
       ],
     },
   ],
@@ -381,8 +381,8 @@ export const CAMPAIGN_CHAPTER_2: ChapterDef = {
     '...........',
   ],
   units: [
-    { id: 'lyn', name: 'Lyn', team: 'player', className: 'Swordsman', x: 2, y: 13 },
-    { id: 'ake', name: 'Ake', team: 'player', className: 'Barbarian', x: 3, y: 13 },
+    { id: 'lyn', name: 'Eirika', team: 'player', className: 'Swordsman', x: 2, y: 13 },
+    { id: 'ake', name: 'Ike', team: 'player', className: 'Barbarian', x: 3, y: 13 },
     { id: 'lissa', name: 'Lissa', team: 'player', className: 'Cleric', x: 4, y: 13 },
     { id: 'corrin', name: 'Corrin', team: 'player', className: 'Lancer', x: 5, y: 13 },
     { id: 'olivia', name: 'Olivia', team: 'player', className: 'Dancer', x: 6, y: 13 },
