@@ -102,6 +102,15 @@ export function buildGameState(
   mode: GameMode,
   random: ShuffleAPI,
   carryOver?: CampaignCarryOver,
+  /**
+   * What a player unit starts at when it has no carry-over entry. Defaults
+   * to PLAYER_START_LEVEL — the caller only overrides this for a campaign
+   * chapter entered directly through Chapter Select, where it's set to
+   * PLAYER_START_LEVEL plus the chapter's position in the list, so jumping
+   * straight into a later chapter doesn't leave the squad under-levelled
+   * for it the way a flat starting level would.
+   */
+  baseLevel: number = PLAYER_START_LEVEL,
 ): GameState {
   const tiles = parseTiles(chapter.rows);
   const width = tiles[0]?.length ?? 0;
@@ -123,7 +132,7 @@ export function buildGameState(
     // default. Enemies never carry over.
     const carried = spec.team === 'player' ? carryOver?.units[spec.id] : undefined;
     // The squad starts battle-tested; a fresh wave-1 enemy hasn't seen combat yet.
-    const level = carried?.level ?? (spec.team === 'player' ? PLAYER_START_LEVEL : 1);
+    const level = carried?.level ?? (spec.team === 'player' ? baseLevel : 1);
     const stats = statsAtLevel(className, level);
 
     units[spec.id] = {

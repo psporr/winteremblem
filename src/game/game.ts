@@ -402,10 +402,11 @@ export function createWinterEmblem(
   mode: GameMode,
   chapter: ChapterDef,
   carryOver?: CampaignCarryOver,
+  baseLevel?: number,
 ): Game<GameState> {
   return {
     ...WinterEmblemBase,
-    setup: ({ random }) => buildGameState(chapter, mode, random, carryOver),
+    setup: ({ random }) => buildGameState(chapter, mode, random, carryOver, baseLevel),
   };
 }
 

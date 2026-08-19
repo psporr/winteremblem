@@ -99,24 +99,6 @@
   border-color: var(--danger);
 }
 
-/* Sits above .we-title__modes rather than inside it, so it needs its own
-   bottom margin to match that container's gap. Gold rather than the blue/red
-   already used for Campaign/Roguelike, so it reads as "pick up where you
-   left off" rather than a third mode. */
-.we-mode-card--continue {
-  margin-bottom: 12px;
-  border-color: #ffd479;
-}
-
-.we-mode-card--continue:hover {
-  border-color: #ffd479;
-  box-shadow: 0 0 0 1px rgba(255, 212, 121, 0.35);
-}
-
-.we-mode-card--continue .we-mode-card__name {
-  color: #ffd479;
-}
-
 .we-mode-card__name {
   font-size: 20px;
   font-weight: 800;
@@ -175,6 +157,20 @@
 .we-chapter--locked {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Continue, when a save exists — gold rather than the neutral chapter-list
+   styling, so it reads as the primary "pick up where you left off" action. */
+.we-chapter--continue {
+  border-color: #ffd479;
+}
+
+.we-chapter--continue:hover {
+  box-shadow: 0 0 0 1px rgba(255, 212, 121, 0.35);
+}
+
+.we-chapter--continue .we-chapter__name {
+  color: #ffd479;
 }
 
 .we-chapter__name {
