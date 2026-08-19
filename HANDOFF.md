@@ -274,43 +274,39 @@ A water tile dropped on a spawn point would otherwise silently brick that unit.
 That table is roughly **1,200 lines of code that Phaser deletes**. The game
 logic (~1,500 lines) is what actually carries over.
 
-### Decided: boardgame.io is reference only, not a dependency
+### Decided: keep boardgame.io as a dependency
 
-**The new project does not depend on boardgame.io.** The old repo is kept as
-*reference material* — consult it for how it solved turn/phase management,
-move validation, and state immutability, then implement equivalents directly.
+**The new project keeps boardgame.io.** Phaser is a *renderer*; boardgame.io is
+a *state machine and transport*. They don't overlap, so they compose cleanly —
+Phaser draws, boardgame.io owns truth.
 
-This is a reasonable call: boardgame.io's React bindings are dead weight
-without React, and the turn logic here is genuinely small. But it moves four
-things onto our plate that the library used to hand us for free. **All four
-must be built deliberately, not discovered later:**
+Keeping it means four things stay solved rather than becoming our problem:
 
-1. **Turn/phase state machine.** Small — the old `turn` config is about 40
-   lines: reset `hasMoved`/`hasActed` for the active team, tick cooldowns,
-   apply regen, auto-end the turn when every unit has acted, plus the
-   battle-end conditions. Port the *behaviour*, write the machine fresh.
+1. **Turn/phase management** — the `turn.onBegin` / `turn.endIf` / `endIf`
+   config carries over close to verbatim (§3, "Turn structure").
+2. **A seeded PRNG behind an injected random API.** The old code never calls
+   `Math.random()`; every roll goes through boardgame.io's seeded random.
+   That injection is exactly what makes deterministic replay and multiplayer
+   sync possible (§8) — keeping the library keeps it for free.
+3. **State immutability** via immer, so moves read as plain mutation while
+   producing new state.
+4. **A multiplayer transport** (§8) — the genuinely hard part, already built.
 
-2. **A seeded PRNG.** This is the one that's easy to miss. The old code never
-   calls `Math.random()` — every roll (item drops, wave composition, class
-   shuffles) goes through an injected random API that boardgame.io supplied
-   and seeded. That injection is *what makes deterministic replay and
-   multiplayer sync possible* (§8). Losing the library means **we must supply
-   our own seeded PRNG behind the same injected-API shape.** Keep the seam;
-   just change what fills it. Do not let `Math.random()` creep into game logic.
+**The one thing to change: drop the React binding.** Import the vanilla client
+from `boardgame.io/client`, not `boardgame.io/react`. The old `scripts/simulate.ts`
+already proves this works with no React anywhere — it constructs a `Client`,
+calls `client.start()`, then loops on `client.getState()` and dispatches moves.
+That is exactly the integration shape a Phaser scene wants:
 
-3. **State immutability.** boardgame.io wrapped moves in immer, so moves could
-   look like plain mutation while producing new state. Without it, either pull
-   in immer directly or adopt a disciplined mutate-a-draft-then-commit
-   convention. Whichever — decide once and hold it, because "sometimes
-   mutating, sometimes not" is how desync bugs start.
+- Construct the vanilla `Client` once, outside the scene.
+- Subscribe to state changes; on each update, reconcile sprites to the new
+  state.
+- Player input dispatches **moves**, never mutates state directly.
+- The scene renders *from* `G` and `ctx`; it never owns authoritative data.
 
-4. **Multiplayer transport** (§8) — no longer free. That's a later problem, but
-   it's now genuinely *our* problem. Firebase/Firestore was the earlier
-   candidate; Colyseus is another; boardgame.io could still be revisited then,
-   for the server only.
-
-None of this is hard. It's all listed so it gets *chosen* rather than
-stumbled into halfway through.
+That last rule is the whole discipline. In Phaser it is tempting to let a
+sprite hold a unit's HP or position — don't. `G` is the truth; sprites are a
+view of it.
 
 ---
 
@@ -390,17 +386,18 @@ designing"). The design has been kept multiplayer-ready throughout:
   server and client agree.
 - Randomness goes through an **injected random API**, never `Math.random()`
   directly. This is what makes deterministic replay/sync possible — preserve it.
-  Since boardgame.io is no longer a dependency (§6), **we supply the seeded
-  PRNG behind that seam ourselves.** The seam matters more than the library.
+  boardgame.io supplies the seeded PRNG behind that seam (§6); never reach past
+  it to `Math.random()` in game logic.
 - **Presentation state is deliberately separate** from synced state: popups,
   banners, dialogue progress, camera, auto-play toggle, fired story events.
   None of that should ever enter the network payload.
 
-Earlier discussion considered **Firebase/Firestore** for hosting. With
-boardgame.io dropped as a dependency (§6), the transport is now an open choice
-to make when multiplayer actually starts — Firebase/Firestore, Colyseus, or
-boardgame.io reintroduced server-side only. Nothing in the design forecloses
-any of them, *provided* the determinism rules above are held.
+Earlier discussion considered **Firebase/Firestore** for hosting. Since
+boardgame.io is staying (§6), its own client/server transport is the path of
+least resistance and should be the default assumption — it's built for exactly
+this and needs no new determinism work. Firebase remains an option if hosting
+or auth requirements push that way, but it would be a deliberate trade, not
+the obvious choice.
 
 **Design implications to respect from day one:**
 - Never let a Phaser sprite own authoritative state.
@@ -461,23 +458,22 @@ the eventual wrap is uneventful:
 ## 11. Suggested first steps in the new project
 
 1. Decide the **name** (leaning toward something ending in "Tactics" — see §2).
-2. Scaffold Phaser 4 + TypeScript + Vite (Phaser publishes an official template).
-   **No boardgame.io dependency** (§6).
+2. Scaffold Phaser 4 + TypeScript + Vite (Phaser publishes an official
+   template), **plus boardgame.io** (§6) — vanilla client only, no React.
 3. Copy `phaserjs/phaser`'s `skills/` into `.claude/skills/phaser/`.
 4. Drop this document in as `HANDOFF.md`.
-5. **Write the seeded PRNG and the injected random-API seam first** (§6.2).
-   It's small, and everything random is built on top of it — retrofitting
-   determinism later is far more painful than starting with it.
-6. **Port the pure game core** — types, classes, combat, grid, skills,
-   equipment, blessings, AI. No rendering at all. It's ~1,500 lines and carries
-   over almost verbatim.
-7. **Write the turn/phase state machine** (§6.1) — the piece boardgame.io used
-   to own. Port the behaviour, not the library.
-8. **Rebuild the headless simulator and get it green** — before drawing a
+5. **Port the pure game core** — types, classes, combat, grid, skills,
+   equipment, blessings, AI, plus the boardgame.io `Game` definition (moves,
+   `turn`, `endIf`). No rendering at all. It's ~1,500 lines and carries over
+   almost verbatim, since none of it was ever React-aware.
+6. **Rebuild the headless simulator and get it green** — before drawing a
    single sprite. If the sim runs a full roguelike run, the core is correct.
-9. *Then* start on the Phaser scene, tilemap, and unit sprites.
-10. Rebuild map validation (BFS connectivity + spawn-tile checks) as a script.
+   The old `scripts/simulate.ts` ports nearly as-is and doubles as the
+   reference for driving the vanilla client without React.
+7. *Then* start on the Phaser scene, tilemap, and unit sprites, rendering from
+   `G`/`ctx` and dispatching moves back.
+8. Rebuild map validation (BFS connectivity + spawn-tile checks) as a script.
 
-Doing 5–8 before 9 is the single most important sequencing call here. The old
+Doing 5–6 before 7 is the single most important sequencing call here. The old
 project's core logic is its most valuable asset, and it can be proven correct
-with zero graphics. Step 5 in particular is cheap now and expensive later.
+with zero graphics.
