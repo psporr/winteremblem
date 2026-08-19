@@ -335,18 +335,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Forest and wall sprites are drawn to sit on a grass base tile, with
-     transparent corners around the tree/rock shape — so every tile gets a
-     grass layer underneath the terrain-specific sprite on top. */
-  background-image: var(--terrain-src), var(--terrain-src);
-  background-repeat: no-repeat, no-repeat;
+  /* Each terrain tile is a single opaque square (own baked-in ground
+     texture, no transparent corners) — unlike the previous tileset, nothing
+     needs to show through from a base layer underneath. */
+  background-image: var(--terrain-src);
+  background-repeat: no-repeat;
   /* Tileset is 3 source tiles wide; each is var(--tile) once scaled up. */
-  background-size:
-    calc(var(--tile) * 3) var(--tile),
-    calc(var(--tile) * 3) var(--tile);
-  background-position:
-    calc(var(--tile) * var(--terrain-index) * -1) 0,
-    0 0;
+  background-size: calc(var(--tile) * 3) var(--tile);
+  background-position: calc(var(--tile) * var(--terrain-index) * -1) 0;
   image-rendering: pixelated;
 }
 

@@ -3,7 +3,7 @@ import type { BoardProps } from 'boardgame.io/react';
 
 import type { GameState, Team, TerrainType, Unit } from '../game/types';
 import { PLAYER_ID, teamOf } from '../game/types';
-import terrainTileset from '../assets/terrain/toen-terrain.png';
+import terrainTileset from '../assets/terrain/sscap-terrain.png';
 import { UNIT_SPRITES, SPRITE_DISPLAY_HEIGHT } from './unitSprites';
 import { ParticleLayer, type ParticleBurstHandle } from './ParticleLayer';
 import { MuteToggle } from './MuteToggle';
@@ -102,8 +102,8 @@ const BOARD_HEIGHT_CAP_PX = 720;
 const EMPTY_REACHABLE = new Map<string, ReachableTile>();
 
 /**
- * Left-to-right tile order in toen-terrain.png, cropped from Toen's Medieval
- * Strategy Sprite Pack (CC-BY 4.0, Andre Mari Coppola — see CREDITS.md).
+ * Left-to-right tile order in sscap-terrain.png, cropped from the
+ * Community-Made SRPG Tileset (CC-BY 3.0, SSCAP — see CREDITS.md).
  */
 const TERRAIN_SPRITE_INDEX: Record<TerrainType, number> = {
   plain: 0,
