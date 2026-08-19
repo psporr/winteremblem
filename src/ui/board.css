@@ -340,13 +340,14 @@ body {
      needs to show through from a base layer underneath. */
   background-image: var(--terrain-src);
   background-repeat: no-repeat;
-  /* Tileset is 3 source tiles wide; each is var(--tile) once scaled up. */
-  background-size: calc(var(--tile) * 3) var(--tile);
+  /* Tileset is 4 source tiles wide; each is var(--tile) once scaled up. */
+  background-size: calc(var(--tile) * 4) var(--tile);
   background-position: calc(var(--tile) * var(--terrain-index) * -1) 0;
   image-rendering: pixelated;
 }
 
-.we-tile--wall {
+.we-tile--wall,
+.we-tile--water {
   cursor: default;
 }
 

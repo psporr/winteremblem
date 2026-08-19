@@ -27,12 +27,13 @@ export interface ShuffleAPI {
 
 /**
  * Maps are authored as ASCII art so they stay easy to eyeball and tweak:
- *   '.' plain   'f' forest   '#' wall
+ *   '.' plain   'f' forest   '#' wall   'w' water
  */
 const LEGEND: Record<string, TerrainType> = {
   '.': 'plain',
   f: 'forest',
   '#': 'wall',
+  w: 'water',
 };
 
 interface UnitPlacement {
@@ -219,10 +220,10 @@ export const CHAPTER_1: ChapterDef = {
   rows: [
     '..##...',
     '.......',
-    '.ff....',
+    '.ff.ww.',
     '...ff..',
-    '.ff....',
-    '...ff..',
+    '.ww.ff.',
+    '...ww..',
     '.......',
     '..##...',
   ],
@@ -278,9 +279,9 @@ export const CAMPAIGN_CHAPTER_1: ChapterDef = {
   rows: [
     '..###..',
     '.......',
-    'ff...ff',
+    'ff.w.ff',
     '..###..',
-    '.......',
+    '..www..',
     '.ff.ff.',
     '.......',
     '...#...',
@@ -369,14 +370,14 @@ export const CAMPAIGN_CHAPTER_2: ChapterDef = {
     '...........',
     '.ff.....ff.',
     '.ff.....ff.',
-    '...........',
+    '....www....',
     '..###.###..',
     '...........',
     '..ff...ff..',
     '..ff...ff..',
     '...........',
     '..###.###..',
-    '...........',
+    '..ww...ww..',
     '.ff.....ff.',
     '...........',
   ],

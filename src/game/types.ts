@@ -25,7 +25,7 @@ export type GameMode = 'roguelike' | 'campaign';
  */
 export type ObjectiveType = 'waves' | 'rout';
 
-export type TerrainType = 'plain' | 'forest' | 'wall';
+export type TerrainType = 'plain' | 'forest' | 'wall' | 'water';
 
 export interface Terrain {
   type: TerrainType;
@@ -41,6 +41,10 @@ export const TERRAIN: Record<TerrainType, Terrain> = {
   plain: { type: 'plain', name: 'Plain', moveCost: 1, passable: true, defBonus: 0 },
   forest: { type: 'forest', name: 'Forest', moveCost: 2, passable: true, defBonus: 2 },
   wall: { type: 'wall', name: 'Wall', moveCost: 0, passable: false, defBonus: 0 },
+  // No unit in the roster can swim or fly, so water blocks movement outright
+  // the same way a wall does — it reads as a river/lake obstacle rather than
+  // rubble, but plays identically: a chokepoint the squad has to go around.
+  water: { type: 'water', name: 'Water', moveCost: 0, passable: false, defBonus: 0 },
 };
 
 /** A slot an item occupies. Each unit has exactly one of each. */

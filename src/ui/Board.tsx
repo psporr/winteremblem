@@ -109,6 +109,7 @@ const TERRAIN_SPRITE_INDEX: Record<TerrainType, number> = {
   plain: 0,
   forest: 1,
   wall: 2,
+  water: 3,
 };
 
 /**

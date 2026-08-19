@@ -7,7 +7,7 @@
 by the SRPG Studio Community Asset Project (SSCAP) Discord server — artists
 Briver, Soviet, General Ciraxis, Kennedy, and Yeedley/CardCafe (concept art),
 licensed under [CC-BY 3.0](http://creativecommons.org/licenses/by/3.0/). Only
-the plain grass, forest, and stone-wall tiles were extracted from the
+the plain grass, forest, stone-wall, and water tiles were extracted from the
 `Outdoor.png` sheet in the pack; no changes were made to the sprites
 themselves.
 
